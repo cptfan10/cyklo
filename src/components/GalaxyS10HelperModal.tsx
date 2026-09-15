@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
 import { Smartphone, HelpCircle, X, BatteryCharging, Sun, ShieldCheck, Download } from 'lucide-react';
+import { ApkInstallModal } from './ApkInstallModal';
 
 export const GalaxyS10HelperModal: React.FC = () => {
   const [isOpen, setIsOpen] = useState(false);
+  const [showApkModal, setShowApkModal] = useState(false);
 
   return (
     <>
@@ -66,9 +68,20 @@ export const GalaxyS10HelperModal: React.FC = () => {
 
               <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800 flex items-start gap-2.5">
                 <Download className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
-                <div>
-                  <strong className="text-white block mb-0.5">Jak nainstalovat jako nativní aplikaci:</strong>
-                  Klepněte na tlačítko <em>„Instalovat”</em> v horní liště nebo v menu Samsung Internet / Chrome zvolte <em>„Přidat na plochu”</em>. Aplikace se spustí bez adresního řádku přes celých 6,4" obrazovky.
+                <div className="flex-1">
+                  <strong className="text-white block mb-0.5">Nativní WebAPK instalace:</strong>
+                  Klepněte na tlačítko <em>„Instalovat APK”</em> v horní liště. Systém Android zkompiluje a nainstaluje plnohodnotnou aplikaci přímo do systému telefonu.
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setIsOpen(false);
+                      setShowApkModal(true);
+                    }}
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-[11px] cursor-pointer"
+                  >
+                    <Download className="w-3.5 h-3.5" />
+                    Otevřít průvodce instalací APK
+                  </button>
                 </div>
               </div>
             </div>
@@ -76,13 +89,15 @@ export const GalaxyS10HelperModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs transition cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs transition cursor-pointer"
             >
               Rozumím a zpět do jízdy
             </button>
           </div>
         </div>
       )}
+
+      <ApkInstallModal isOpen={showApkModal} onClose={() => setShowApkModal(false)} />
     </>
   );
 };

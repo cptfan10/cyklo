@@ -1,6 +1,25 @@
 <!doctype html>
 <html lang="cs">
   <head>
+    <script>
+      // Suppress benign [vite] HMR websocket connection messages in sandboxed iframe preview
+      (function() {
+        var origError = console.error;
+        console.error = function() {
+          if (arguments.length > 0 && typeof arguments[0] === 'string' && (arguments[0].indexOf('[vite]') !== -1 || arguments[0].indexOf('failed to connect to websocket') !== -1)) {
+            return;
+          }
+          return origError.apply(console, arguments);
+        };
+        var origWarn = console.warn;
+        console.warn = function() {
+          if (arguments.length > 0 && typeof arguments[0] === 'string' && (arguments[0].indexOf('[vite]') !== -1 || arguments[0].indexOf('websocket') !== -1)) {
+            return;
+          }
+          return origWarn.apply(console, arguments);
+        };
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0c0a09" />
@@ -9,6 +28,8 @@
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <link rel="manifest" href="/manifest.json" />
     <link rel="icon" type="image/svg+xml" href="/icon.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/pwa-192x192.png" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <title>Cyklistický Asistent</title>
     <meta name="description" content="Chytrý asistent pro cyklistiku se živým záznamem trasy na veřejných mapách, měřením kilometrů, rychlosti, převýšení a pokročilou AI analýzou výkonu." />
     <meta property="og:title" content="Cyklistický Asistent" />

@@ -505,10 +505,16 @@ app.all("/api/*", (_req, res) => {
 });
 
 async function startServer() {
+  // Serve static files from public (e.g. zip packages, icons)
+  app.use(express.static(path.join(process.cwd(), "public")));
+
   // Vite middleware for development
   if (process.env.NODE_ENV !== "production") {
     const vite = await createViteServer({
-      server: { middlewareMode: true },
+      server: {
+        middlewareMode: true,
+        hmr: false,
+      },
       appType: "spa",
     });
     app.use(vite.middlewares);
