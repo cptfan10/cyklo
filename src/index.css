@@ -1,0 +1,23 @@
+@import "tailwindcss";
+
+/* Samsung Galaxy S10+ & Modern Android AMOLED / Notch Safe Areas */
+:root {
+  --sat: env(safe-area-inset-top, 0px);
+  --sar: env(safe-area-inset-right, 0px);
+  --sab: env(safe-area-inset-bottom, 0px);
+  --sal: env(safe-area-inset-left, 0px);
+}
+
+/* Prevent double-tap to zoom on cycling controls while riding */
+button, a {
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* Ensure full dynamic height across mobile browsers (dvb / svh) */
+html, body, #root {
+  height: 100%;
+  width: 100%;
+  overflow: hidden;
+  background-color: #0c0a09;
+}

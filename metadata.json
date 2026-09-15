@@ -1,0 +1,10 @@
+{
+  "name": "Cyklistický Asistent",
+  "description": "Chytrý asistent pro cyklistiku se živým záznamem trasy na veřejných mapách, měřením kilometrů, rychlosti, převýšení a pokročilou AI analýzou výkonu.",
+  "requestFramePermissions": [
+    "geolocation"
+  ],
+  "majorCapabilities": [
+    "MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"
+  ]
+}
