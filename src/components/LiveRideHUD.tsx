@@ -63,10 +63,10 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
   onReset
 }) => {
   return (
-    <div className="w-full bg-stone-900/98 border-t border-stone-800 backdrop-blur-md px-3 sm:px-5 pt-3 pb-3 sm:pb-4 flex flex-col gap-3 sm:gap-4 shadow-2xl z-30 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))]">
+    <div className="w-full glass-panel px-3 sm:px-5 pt-3 pb-3 sm:pb-4 flex flex-col gap-3 sm:gap-4 z-30 [padding-bottom:max(0.75rem,env(safe-area-inset-bottom))] !rounded-b-none !border-x-0 !border-b-0">
       {/* GPS Warning if error */}
       {gpsError && status !== 'idle' && !isSimulated && (
-        <div className="bg-amber-500/15 border border-amber-500/30 rounded-xl p-2.5 sm:p-3 flex items-start gap-2.5 text-amber-200 text-xs sm:text-sm">
+        <div className="glass-tile !bg-amber-950/60 !border-amber-500/30 p-2.5 sm:p-3 flex items-start gap-2.5 text-amber-200 text-xs sm:text-sm">
           <AlertTriangle className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
           <div className="flex-1">
             <span>{gpsError}</span>
@@ -86,7 +86,7 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
       )}
 
       {/* Top Status Bar: Live Indicator, GPS Info, Screen Wake Lock */}
-      <div className="flex items-center justify-between text-xs text-stone-400 gap-2 flex-wrap">
+      <div className="flex items-center justify-between text-xs text-stone-300 gap-2 flex-wrap">
         <div className="flex items-center gap-2">
           {status === 'recording' && (
             <div className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-rose-500/20 border border-rose-500/40 text-rose-300 font-medium">
@@ -100,12 +100,12 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
             </div>
           )}
           {status === 'idle' && (
-            <div className="px-2.5 py-1 rounded-full bg-stone-800 border border-stone-700 text-stone-400 text-[10px] sm:text-[11px] uppercase tracking-wide">
+            <div className="px-2.5 py-1 rounded-full bg-stone-800/80 border border-stone-700/80 text-stone-300 text-[10px] sm:text-[11px] uppercase tracking-wide">
               Připraveno ke startu
             </div>
           )}
           {isSimulated && (
-            <span className="px-2 py-0.5 rounded-md bg-cyan-950/60 border border-cyan-800/40 text-cyan-300 text-[10px] sm:text-[11px]">
+            <span className="px-2 py-0.5 rounded-md bg-cyan-950/70 border border-cyan-800/40 text-cyan-300 text-[10px] sm:text-[11px]">
               Demo
             </span>
           )}
@@ -132,7 +132,7 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
                 onOpenCockpit();
               }}
               title="Otevřít celoobrazovkový režim na řídítka (Cockpit)"
-              className="px-2.5 py-1 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700 text-[10px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+              className="px-2.5 py-1 rounded-full bg-stone-800/80 hover:bg-stone-700/90 text-stone-200 hover:text-white border border-stone-700 text-[10px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
             >
               <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
               <span>Cockpit</span>
@@ -142,13 +142,13 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
 
         <div className="flex items-center gap-3 shrink-0">
           {gpsAccuracy !== null && !isSimulated && (
-            <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-stone-400">
+            <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-stone-300">
               <Radio className="w-3.5 h-3.5 text-emerald-400" />
               GPS: {Math.round(gpsAccuracy)} m
             </span>
           )}
           {currentElevationM !== undefined && (
-            <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-stone-400">
+            <span className="flex items-center gap-1 text-[10px] sm:text-[11px] text-stone-300">
               <Compass className="w-3.5 h-3.5 text-cyan-400" />
               {currentElevationM} m n.m.
             </span>
@@ -156,12 +156,12 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
         </div>
       </div>
 
-      {/* Primary Metrics Grid - AMOLED High-Contrast optimized */}
+      {/* Primary Metrics Grid - Glassmorphism style with AMOLED high contrast */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 sm:gap-3">
         {/* Speed Gauge / Big Readout */}
-        <div className="col-span-2 sm:col-span-1 bg-stone-950/90 border border-stone-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden group shadow-inner">
-          <div className="flex items-center justify-between text-stone-400 text-xs">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Aktuální rychlost</span>
+        <div className="col-span-2 sm:col-span-1 glass-tile p-3 sm:p-4 flex flex-col justify-between relative overflow-hidden group">
+          <div className="flex items-center justify-between text-stone-300 text-xs">
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-stone-300">Aktuální rychlost</span>
             <Gauge className="w-4 h-4 text-emerald-400" />
           </div>
           <div className="my-1.5 sm:my-2 flex items-baseline gap-1.5">
@@ -170,16 +170,16 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
             </span>
             <span className="text-xs sm:text-sm font-bold text-emerald-400">km/h</span>
           </div>
-          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-stone-400 pt-1 border-t border-stone-800/80">
-            <span>Max: <strong className="text-stone-200">{maxSpeedKmh.toFixed(1)}</strong></span>
-            <span>Průměr: <strong className="text-stone-200">{avgSpeedKmh.toFixed(1)}</strong></span>
+          <div className="flex items-center justify-between text-[10px] sm:text-[11px] text-stone-300 pt-1 border-t border-white/10">
+            <span>Max: <strong className="text-white">{maxSpeedKmh.toFixed(1)}</strong></span>
+            <span>Průměr: <strong className="text-white">{avgSpeedKmh.toFixed(1)}</strong></span>
           </div>
         </div>
 
         {/* Distance Traveled */}
-        <div className="bg-stone-950/90 border border-stone-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between shadow-inner">
-          <div className="flex items-center justify-between text-stone-400 text-xs">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Vzdálenost</span>
+        <div className="glass-tile p-3 sm:p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-stone-300 text-xs">
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-stone-300">Vzdálenost</span>
             <Zap className="w-4 h-4 text-amber-400" />
           </div>
           <div className="my-1 sm:my-2 flex items-baseline gap-1">
@@ -188,15 +188,15 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
             </span>
             <span className="text-xs sm:text-sm font-bold text-amber-400">km</span>
           </div>
-          <div className="text-[10px] sm:text-[11px] text-stone-400 truncate">
-            Tempo: <span className="text-stone-200">{avgSpeedKmh > 0 ? (60 / avgSpeedKmh).toFixed(1) : '0.0'} min/km</span>
+          <div className="text-[10px] sm:text-[11px] text-stone-300 truncate">
+            Tempo: <span className="text-white font-medium">{avgSpeedKmh > 0 ? (60 / avgSpeedKmh).toFixed(1) : '0.0'} min/km</span>
           </div>
         </div>
 
         {/* Duration / Time */}
-        <div className="bg-stone-950/90 border border-stone-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between shadow-inner">
-          <div className="flex items-center justify-between text-stone-400 text-xs">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Čas jízdy</span>
+        <div className="glass-tile p-3 sm:p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-stone-300 text-xs">
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-stone-300">Čas jízdy</span>
             <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
           </div>
           <div className="my-1 sm:my-2">
@@ -204,29 +204,29 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
               {formatDuration(durationSeconds)}
             </span>
           </div>
-          <div className="text-[10px] sm:text-[11px] text-stone-400">
+          <div className="text-[10px] sm:text-[11px] text-stone-300">
             Stopky trasy
           </div>
         </div>
 
         {/* Elevation & Calories */}
-        <div className="col-span-2 sm:col-span-1 bg-stone-950/90 border border-stone-800 rounded-2xl p-3 sm:p-4 flex flex-col justify-between shadow-inner">
-          <div className="flex items-center justify-between text-stone-400 text-xs">
-            <span className="font-semibold uppercase tracking-wider text-[11px]">Výkon & Kopce</span>
+        <div className="col-span-2 sm:col-span-1 glass-tile p-3 sm:p-4 flex flex-col justify-between">
+          <div className="flex items-center justify-between text-stone-300 text-xs">
+            <span className="font-semibold uppercase tracking-wider text-[11px] text-stone-300">Výkon & Kopce</span>
             <Mountain className="w-4 h-4 text-cyan-400" />
           </div>
           <div className="my-1 flex items-center justify-between">
             <div>
               <span className="text-2xl font-bold font-mono text-white">+{elevationGainM}</span>
-              <span className="text-xs text-cyan-400 ml-1">m</span>
+              <span className="text-xs text-cyan-400 ml-1 font-bold">m</span>
             </div>
             <div className="flex items-center gap-1">
               <Flame className="w-3.5 h-3.5 text-orange-400" />
               <span className="text-xl font-bold font-mono text-white">{caloriesBurned}</span>
-              <span className="text-xs text-orange-400">kcal</span>
+              <span className="text-xs text-orange-400 font-bold">kcal</span>
             </div>
           </div>
-          <div className="text-[10px] sm:text-[11px] text-stone-400">
+          <div className="text-[10px] sm:text-[11px] text-stone-300">
             Stoupání & Výdej energie
           </div>
         </div>

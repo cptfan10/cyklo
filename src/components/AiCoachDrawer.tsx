@@ -125,26 +125,26 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
   };
 
   return (
-    <div className="fixed inset-y-0 right-0 z-[700] w-full max-w-md bg-stone-900 border-l border-stone-800 shadow-2xl flex flex-col animate-in slide-in-from-right duration-300">
+    <div className="fixed inset-y-0 right-0 z-[700] w-full max-w-md glass-panel !rounded-none !border-y-0 !border-r-0 flex flex-col animate-in slide-in-from-right duration-300">
       {/* Header */}
-      <div className="p-4 border-b border-stone-800 bg-stone-950/80 flex items-center justify-between">
+      <div className="p-4 border-b border-white/10 bg-stone-950/40 flex items-center justify-between">
         <div className="flex items-center gap-2.5">
           <div className="w-8 h-8 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400">
             <Bot className="w-5 h-5" />
           </div>
           <div>
-            <h3 className="font-bold text-sm text-stone-100 flex items-center gap-1.5">
+            <h3 className="font-bold text-sm text-white flex items-center gap-1.5">
               Cyklistický AI Asistent
               <span className="w-2 h-2 rounded-full bg-emerald-400"></span>
             </h3>
-            <p className="text-[11px] text-stone-400">Osobní trenér a rádce pro vyjížďky</p>
+            <p className="text-[11px] text-stone-300">Osobní trenér a rádce pro vyjížďky</p>
           </div>
         </div>
         <button
           id="btn-close-coach"
           type="button"
           onClick={onClose}
-          className="p-1.5 rounded-lg bg-stone-800 text-stone-400 hover:text-white hover:bg-stone-700 transition-all cursor-pointer"
+          className="p-1.5 rounded-lg bg-stone-800/80 text-stone-300 hover:text-white hover:bg-stone-700 transition-all cursor-pointer"
         >
           <X className="w-5 h-5" />
         </button>
@@ -163,10 +163,10 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
               </div>
             )}
             <div
-              className={`max-w-[85%] rounded-2xl px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
+              className={`max-w-[85%] px-3.5 py-2.5 text-xs sm:text-sm leading-relaxed ${
                 m.role === 'user'
-                  ? 'bg-emerald-600 text-white rounded-br-none shadow-md'
-                  : 'bg-stone-950/90 text-stone-200 border border-stone-800 rounded-bl-none'
+                  ? 'bg-emerald-600 text-white rounded-2xl rounded-br-none shadow-md'
+                  : 'glass-tile text-stone-100 !rounded-bl-none shadow-md'
               }`}
             >
               {m.role === 'user' ? (
@@ -186,7 +186,7 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
         ))}
 
         {isLoading && (
-          <div className="flex items-center gap-2 text-xs text-stone-400 py-1">
+          <div className="flex items-center gap-2 text-xs text-stone-300 py-1">
             <Loader2 className="w-4 h-4 animate-spin text-emerald-400" />
             <span>Trenér přemýšlí nad odpovědí...</span>
           </div>
@@ -194,8 +194,8 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
       </div>
 
       {/* Suggested Quick Prompts */}
-      <div className="p-3 bg-stone-950/40 border-t border-stone-800/80">
-        <div className="text-[11px] font-semibold text-stone-500 mb-1.5 flex items-center gap-1">
+      <div className="p-3 bg-stone-950/40 border-t border-white/10">
+        <div className="text-[11px] font-semibold text-stone-400 mb-1.5 flex items-center gap-1">
           <HelpCircle className="w-3 h-3" />
           Rychlé otázky na asistenta:
         </div>
@@ -205,7 +205,7 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
               key={idx}
               type="button"
               onClick={() => handleSendMessage(q)}
-              className="text-[11px] px-2.5 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-700 text-stone-300 border border-stone-700 transition-all cursor-pointer text-left"
+              className="text-[11px] px-2.5 py-1 rounded-lg glass-tile-interactive !rounded-lg text-stone-200 transition-all cursor-pointer text-left"
             >
               {q}
             </button>
@@ -219,7 +219,7 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
           e.preventDefault();
           handleSendMessage();
         }}
-        className="p-3 bg-stone-950 border-t border-stone-800 flex items-center gap-2"
+        className="p-3 bg-stone-950/50 border-t border-white/10 flex items-center gap-2"
       >
         <input
           id="input-coach-chat"
@@ -227,7 +227,7 @@ export const AiCoachDrawer: React.FC<AiCoachDrawerProps> = ({
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder="Zeptejte se cyklo asistenta..."
-          className="flex-1 bg-stone-900 border border-stone-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-200 placeholder-stone-500 outline-none focus:border-emerald-500"
+          className="flex-1 glass-tile !rounded-xl px-3 py-2 text-xs sm:text-sm text-white placeholder-stone-400 outline-none focus:!border-emerald-500"
         />
         <button
           id="btn-send-coach"

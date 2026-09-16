@@ -21,3 +21,31 @@ html, body, #root {
   overflow: hidden;
   background-color: #0c0a09;
 }
+
+/* Glassmorphism Styles (Frosted Glass Premium Visuals) */
+.glass-panel,
+.glass-card,
+.glass-tile,
+.glass-modal {
+  background: rgba(20, 24, 30, 0.75) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+}
+
+.glass-tile-interactive {
+  background: rgba(20, 24, 30, 0.75) !important;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border: 1px solid rgba(255, 255, 255, 0.08) !important;
+  border-radius: 16px !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.37) !important;
+  transition: all 0.2s ease;
+}
+
+.glass-tile-interactive:hover {
+  background: rgba(26, 32, 40, 0.85) !important;
+  border-color: rgba(255, 255, 255, 0.16) !important;
+}

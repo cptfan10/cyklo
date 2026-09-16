@@ -89,15 +89,15 @@ export const HandlebarCockpitModal: React.FC<HandlebarCockpitModalProps> = ({
 
       {/* Planned route guidance banner if active */}
       {plannedRoute && (
-        <div className="bg-stone-900/80 border border-cyan-500/40 rounded-2xl p-3 my-2">
+        <div className="glass-card p-3.5 my-2 !border-cyan-500/40">
           <div className="flex items-center justify-between text-xs mb-1">
-            <span className="font-bold text-cyan-400 truncate">{plannedRoute.routeName}</span>
-            <span className="font-mono text-stone-300">{progressPercent}% hotovo</span>
+            <span className="font-bold text-cyan-300 truncate">{plannedRoute.routeName}</span>
+            <span className="font-mono text-stone-200">{progressPercent}% hotovo</span>
           </div>
-          <div className="h-2 w-full bg-stone-950 rounded-full overflow-hidden mb-2">
+          <div className="h-2 w-full bg-stone-950/80 rounded-full overflow-hidden mb-2">
             <div className="h-full bg-cyan-400 rounded-full transition-all duration-300" style={{ width: `${progressPercent}%` }} />
           </div>
-          <div className="flex items-center justify-between text-xs font-mono text-stone-400">
+          <div className="flex items-center justify-between text-xs font-mono text-stone-300">
             <span>Ujeto: {distanceKm.toFixed(1)} km</span>
             <span className="text-white font-bold">Do cíle: {remainingKm?.toFixed(1)} km</span>
           </div>
@@ -106,51 +106,51 @@ export const HandlebarCockpitModal: React.FC<HandlebarCockpitModalProps> = ({
 
       {/* MAIN SPEEDOMETER HERO (Giant AMOLED numbers) */}
       <div className="flex-1 flex flex-col items-center justify-center text-center my-auto">
-        <span className="text-xs sm:text-sm uppercase tracking-widest text-stone-500 font-bold mb-1">
+        <span className="text-xs sm:text-sm uppercase tracking-widest text-stone-400 font-bold mb-1">
           Okamžitá rychlost
         </span>
         <div className="flex items-baseline justify-center">
           <span className="text-8xl sm:text-9xl font-black font-mono tracking-tighter text-white drop-shadow-[0_4px_24px_rgba(16,185,129,0.25)]">
             {currentSpeedKmh.toFixed(1)}
           </span>
-          <span className="text-xl sm:text-2xl font-bold font-sans text-stone-400 ml-2">km/h</span>
+          <span className="text-xl sm:text-2xl font-bold font-sans text-stone-300 ml-2">km/h</span>
         </div>
       </div>
 
-      {/* SECONDARY METRICS BENTO GRID */}
+      {/* SECONDARY METRICS BENTO GRID (Glassmorphism tiles) */}
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5 sm:gap-3 mb-4">
         {/* Distance */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-stone-950 border border-stone-800 text-center">
-          <span className="text-[11px] text-stone-500 uppercase tracking-wider block font-bold">Vzdálenost</span>
+        <div className="glass-tile p-3 sm:p-4 text-center">
+          <span className="text-[11px] text-stone-300 uppercase tracking-wider block font-bold">Vzdálenost</span>
           <div className="text-2xl sm:text-3xl font-mono font-black text-emerald-400 mt-0.5">
             {distanceKm.toFixed(1)}
-            <span className="text-xs font-normal text-stone-500 ml-1">km</span>
+            <span className="text-xs font-bold text-emerald-400/80 ml-1">km</span>
           </div>
         </div>
 
         {/* Time */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-stone-950 border border-stone-800 text-center">
-          <span className="text-[11px] text-stone-500 uppercase tracking-wider block font-bold">Čas jízdy</span>
+        <div className="glass-tile p-3 sm:p-4 text-center">
+          <span className="text-[11px] text-stone-300 uppercase tracking-wider block font-bold">Čas jízdy</span>
           <div className="text-2xl sm:text-3xl font-mono font-black text-cyan-400 mt-0.5">
             {formatDuration(durationSeconds)}
           </div>
         </div>
 
         {/* Avg Speed */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-stone-950 border border-stone-800 text-center">
-          <span className="text-[11px] text-stone-500 uppercase tracking-wider block font-bold">Průměrná rychlost</span>
+        <div className="glass-tile p-3 sm:p-4 text-center">
+          <span className="text-[11px] text-stone-300 uppercase tracking-wider block font-bold">Průměrná rychlost</span>
           <div className="text-2xl sm:text-3xl font-mono font-black text-white mt-0.5">
             {avgSpeedKmh.toFixed(1)}
-            <span className="text-xs font-normal text-stone-500 ml-1">km/h</span>
+            <span className="text-xs font-bold text-stone-300 ml-1">km/h</span>
           </div>
         </div>
 
         {/* Elevation Climb */}
-        <div className="p-3 sm:p-4 rounded-2xl bg-stone-950 border border-stone-800 text-center">
-          <span className="text-[11px] text-stone-500 uppercase tracking-wider block font-bold">Nastoupáno</span>
+        <div className="glass-tile p-3 sm:p-4 text-center">
+          <span className="text-[11px] text-stone-300 uppercase tracking-wider block font-bold">Nastoupáno</span>
           <div className="text-2xl sm:text-3xl font-mono font-black text-amber-400 mt-0.5">
             +{elevationGainM}
-            <span className="text-xs font-normal text-stone-500 ml-1">m</span>
+            <span className="text-xs font-bold text-amber-400/80 ml-1">m</span>
           </div>
         </div>
       </div>

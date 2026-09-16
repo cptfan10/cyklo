@@ -211,21 +211,21 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-6 bg-black/85 backdrop-blur-md overflow-y-auto">
-      <div className="relative w-full max-w-3xl bg-stone-900 border border-stone-800 rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[92vh]">
+    <div className="fixed inset-0 z-[600] flex items-center justify-center p-3 sm:p-6 bg-black/75 backdrop-blur-md overflow-y-auto">
+      <div className="relative w-full max-w-3xl glass-modal overflow-hidden flex flex-col max-h-[92vh] !rounded-2xl">
         {/* Header */}
-        <div className="p-4 sm:p-6 border-b border-stone-800 bg-stone-950/70 flex items-start justify-between">
+        <div className="p-4 sm:p-6 border-b border-white/10 bg-stone-950/40 flex items-start justify-between">
           <div className="flex-1 pr-4">
             <div className="flex items-center gap-2 mb-1.5 flex-wrap">
               <span className="px-2.5 py-0.5 rounded-full bg-emerald-500/20 text-emerald-300 text-xs font-semibold border border-emerald-500/30 flex items-center gap-1">
                 <Sparkles className="w-3 h-3 text-emerald-400" />
                 AI Rozbor vyjížďky
               </span>
-              <span className="text-xs text-stone-400">
+              <span className="text-xs text-stone-300">
                 {new Date(ride.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
               {analysisSource && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-stone-800 text-stone-400 border border-stone-700">
+                <span className="text-[10px] px-2 py-0.5 rounded bg-stone-800/80 text-stone-300 border border-white/10">
                   {analysisSource.includes('gemini') ? 'Gemini 3 AI' : 'Cyklo AI'}
                 </span>
               )}
@@ -236,47 +236,47 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
               value={rideName}
               onChange={(e) => setRideName(e.target.value)}
               placeholder="Pojmenujte svou jízdu..."
-              className="text-lg sm:text-2xl font-bold text-white bg-transparent border-b border-stone-700/60 focus:border-emerald-500 outline-none w-full pb-1 transition-all"
+              className="text-lg sm:text-2xl font-bold text-white bg-transparent border-b border-white/20 focus:border-emerald-400 outline-none w-full pb-1 transition-all"
             />
           </div>
           <button
             id="btn-close-analysis"
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-white transition-all cursor-pointer shrink-0"
+            className="p-2 rounded-xl bg-stone-800/80 hover:bg-stone-700 text-stone-300 hover:text-white transition-all cursor-pointer shrink-0 border border-white/10"
           >
             <X className="w-5 h-5" />
           </button>
         </div>
 
-        {/* Quick Stats Strip */}
-        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 sm:p-4 bg-stone-950/40 border-b border-stone-800/80 text-xs sm:text-sm">
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-stone-800/50 border border-stone-700/40">
+        {/* Quick Stats Strip (Glassmorphism tiles) */}
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 p-3 sm:p-4 bg-stone-950/30 border-b border-white/10 text-xs sm:text-sm">
+          <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Gauge className="w-4 h-4 text-emerald-400 shrink-0" />
             <div>
               <div className="text-[11px] text-stone-400">Vzdálenost</div>
-              <div className="font-bold font-mono text-stone-100">{ride.distanceKm.toFixed(2)} km</div>
+              <div className="font-bold font-mono text-white">{ride.distanceKm.toFixed(2)} km</div>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-stone-800/50 border border-stone-700/40">
+          <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Clock className="w-4 h-4 text-amber-400 shrink-0" />
             <div>
               <div className="text-[11px] text-stone-400">Čas jízdy</div>
-              <div className="font-bold font-mono text-stone-100">{formatDuration(ride.durationSeconds)}</div>
+              <div className="font-bold font-mono text-white">{formatDuration(ride.durationSeconds)}</div>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-stone-800/50 border border-stone-700/40">
+          <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Mountain className="w-4 h-4 text-cyan-400 shrink-0" />
             <div>
               <div className="text-[11px] text-stone-400">Převýšení</div>
-              <div className="font-bold font-mono text-stone-100">+{ride.elevationGainM} m</div>
+              <div className="font-bold font-mono text-white">+{ride.elevationGainM} m</div>
             </div>
           </div>
-          <div className="flex items-center gap-2.5 p-2 rounded-xl bg-stone-800/50 border border-stone-700/40">
+          <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Flame className="w-4 h-4 text-orange-400 shrink-0" />
             <div>
               <div className="text-[11px] text-stone-400">Výdej kalorií</div>
-              <div className="font-bold font-mono text-stone-100">{ride.caloriesBurned} kcal</div>
+              <div className="font-bold font-mono text-white">{ride.caloriesBurned} kcal</div>
             </div>
           </div>
         </div>
@@ -286,7 +286,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
           {/* Bike and Cyclist Notes Inputs */}
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             <div>
-              <label htmlFor="select-bike-type" className="block text-xs font-semibold text-stone-400 mb-1 flex items-center gap-1.5">
+              <label htmlFor="select-bike-type" className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
                 <Bike className="w-3.5 h-3.5 text-emerald-400" />
                 Typ kola
               </label>
@@ -294,7 +294,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
                 id="select-bike-type"
                 value={bikeType}
                 onChange={(e) => setBikeType(e.target.value)}
-                className="w-full bg-stone-950 border border-stone-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-200 outline-none focus:border-emerald-500"
+                className="w-full bg-stone-950/80 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-100 outline-none focus:border-emerald-500"
               >
                 <option value="Silniční / Gravel">Silniční / Gravel</option>
                 <option value="Horský (MTB)">Horský (MTB)</option>
@@ -305,7 +305,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
             </div>
 
             <div>
-              <label htmlFor="input-cyclist-notes" className="block text-xs font-semibold text-stone-400 mb-1">
+              <label htmlFor="input-cyclist-notes" className="block text-xs font-semibold text-stone-300 mb-1">
                 Poznámka k pocitu / terénu
               </label>
               <input
@@ -314,13 +314,13 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
                 value={notes}
                 onChange={(e) => setNotes(e.target.value)}
                 placeholder="Např. silný protivítr, těžké nohy v kopcích..."
-                className="w-full bg-stone-950 border border-stone-700 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-200 outline-none focus:border-emerald-500"
+                className="w-full bg-stone-950/80 border border-white/10 rounded-xl px-3 py-2 text-xs sm:text-sm text-stone-100 outline-none focus:border-emerald-500"
               />
             </div>
           </div>
 
           {/* AI Analysis Card */}
-          <div className="bg-stone-950/80 border border-stone-800 rounded-2xl p-4 sm:p-5 flex flex-col gap-3">
+          <div className="glass-card p-4 sm:p-5 flex flex-col gap-3">
             <div className="flex items-center justify-between flex-wrap gap-2">
               <div className="flex items-center gap-2">
                 <div className="p-1.5 rounded-lg bg-emerald-500/20 text-emerald-400">
@@ -414,9 +414,9 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
           </div>
 
           {/* Export & Data Sharing */}
-          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 bg-stone-950/40 border border-stone-800 rounded-2xl">
+          <div className="flex flex-wrap items-center justify-between gap-3 p-3.5 glass-card">
             <div className="text-xs text-stone-400">
-              <strong className="text-stone-300 block mb-0.5">Export do navigačních aplikací (GPX)</strong>
+              <strong className="text-stone-200 block mb-0.5">Export do navigačních aplikací (GPX)</strong>
               Kompatibilní se Strava, Garmin Connect, Mapy.cz, Komoot a Wahoo.
             </div>
             <div className="flex items-center gap-2">
@@ -424,7 +424,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
                 id="btn-export-gpx"
                 type="button"
                 onClick={handleExportGpx}
-                className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 text-xs font-semibold flex items-center gap-1.5 border border-stone-700 transition-all cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-stone-800/80 hover:bg-stone-700 text-stone-200 text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer"
               >
                 <Download className="w-3.5 h-3.5 text-emerald-400" />
                 Stáhnout GPX
@@ -433,7 +433,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
                 id="btn-export-json"
                 type="button"
                 onClick={handleExportJson}
-                className="px-3 py-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-300 text-xs font-semibold flex items-center gap-1.5 border border-stone-700 transition-all cursor-pointer"
+                className="px-3 py-1.5 rounded-xl bg-stone-800/80 hover:bg-stone-700 text-stone-300 text-xs font-semibold flex items-center gap-1.5 border border-white/10 transition-all cursor-pointer"
               >
                 JSON záloha
               </button>
@@ -442,12 +442,12 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
         </div>
 
         {/* Footer Actions */}
-        <div className="p-4 sm:p-5 border-t border-stone-800 bg-stone-950/90 flex items-center justify-between gap-3">
+        <div className="p-4 sm:p-5 border-t border-white/10 bg-stone-950/40 flex items-center justify-between gap-3">
           <button
             id="btn-discard"
             type="button"
             onClick={onClose}
-            className="px-4 py-2.5 rounded-xl text-stone-400 hover:text-stone-200 text-xs sm:text-sm font-medium transition-all cursor-pointer"
+            className="px-4 py-2.5 rounded-xl text-stone-300 hover:text-white text-xs sm:text-sm font-medium transition-all cursor-pointer"
           >
             Zavřít
           </button>

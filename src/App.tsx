@@ -21,10 +21,11 @@ export default function App() {
   // Saved rides in session state: starts completely empty on every startup ("A ať to je při každém spuštění prázdné")
   const [rides, setRides] = useState<RideData[]>([]);
 
-  // Clear storage on startup so the app is always 100% empty on every launch/refresh
+  // Clear storage on startup so the app is always 100% empty on every launch/refresh ("A ať to je při každém spuštění prázdné")
   useEffect(() => {
     try {
-      localStorage.removeItem(STORAGE_KEY_RIDES);
+      localStorage.clear();
+      sessionStorage.clear();
     } catch (e) {
       console.warn('Storage reset on start:', e);
     }
@@ -131,7 +132,7 @@ export default function App() {
   return (
     <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-950 text-stone-100 font-sans">
       {/* Top Navigation Bar with Galaxy S10+ notch / safe-area padding */}
-      <header className="h-16 px-3 sm:px-6 bg-stone-900/95 border-b border-stone-800/80 backdrop-blur-md flex items-center justify-between z-40 shrink-0 [padding-top:max(0.25rem,env(safe-area-inset-top))]">
+      <header className="h-16 px-3 sm:px-6 glass-panel !rounded-none !border-x-0 !border-t-0 flex items-center justify-between z-40 shrink-0 [padding-top:max(0.25rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
           <div className="w-9 h-9 sm:w-10 sm:h-10 rounded-2xl bg-gradient-to-tr from-emerald-600 to-teal-400 flex items-center justify-center text-stone-950 shadow-lg shadow-emerald-500/20 shrink-0">
             <Bike className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
@@ -154,7 +155,7 @@ export default function App() {
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2">
-          <div className="bg-stone-950/80 p-1 rounded-xl border border-stone-800 flex items-center gap-1">
+          <div className="glass-tile !p-1 !rounded-xl flex items-center gap-1">
             {/* Live Map Tab */}
             <button
               id="tab-live-map"
@@ -163,7 +164,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'live'
                   ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
-                  : 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-300 hover:text-white'
               }`}
             >
               <Compass className="w-3.5 h-3.5" />
@@ -175,7 +176,7 @@ export default function App() {
               id="btn-open-planner-window"
               type="button"
               onClick={() => setIsPlannerModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/35 shadow-sm"
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 shadow-sm"
               title="Otevřít asistenta plánování tras v samostatném okně"
             >
               <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
@@ -191,7 +192,7 @@ export default function App() {
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'history'
                   ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
-                  : 'text-stone-400 hover:text-stone-200'
+                  : 'text-stone-300 hover:text-white'
               }`}
             >
               <History className="w-3.5 h-3.5" />
@@ -204,7 +205,7 @@ export default function App() {
             id="btn-open-coach"
             type="button"
             onClick={() => setIsCoachDrawerOpen(true)}
-            className="px-2.5 sm:px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-500/20 to-teal-500/20 hover:from-emerald-500/30 hover:to-teal-500/30 border border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+            className="px-2.5 sm:px-3.5 py-2 rounded-xl glass-tile-interactive !rounded-xl !border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
           >
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">AI Trenér</span>
@@ -241,14 +242,14 @@ export default function App() {
             className="w-full h-full"
           />
 
-          {/* Quick launcher button on map when idle and no route is planned */}
+          {/* Quick launcher button on map when idle and no route is planned (positioned cleanly at top-16 left-4 below tile switcher) */}
           {!plannedRoute && recorder.status === 'idle' && !selectedRide && (
-            <div className="absolute top-4 left-4 z-[400]">
+            <div className="absolute top-16 left-4 z-[400]">
               <button
                 id="btn-map-quick-planner"
                 type="button"
                 onClick={() => setIsPlannerModalOpen(true)}
-                className="px-3.5 py-2.5 rounded-2xl bg-stone-900/95 hover:bg-stone-800 text-stone-100 border border-cyan-500/50 shadow-2xl backdrop-blur-md text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer group hover:border-cyan-400"
+                className="px-3.5 py-2.5 glass-card !border-cyan-500/50 hover:!border-cyan-400 text-stone-100 shadow-2xl text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer group"
               >
                 <div className="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center">
                   <Sparkles className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400 group-hover:rotate-12 transition-transform" />
@@ -260,7 +261,7 @@ export default function App() {
 
           {/* If viewing historical track badge on map */}
           {selectedRide && recorder.status === 'idle' && (
-            <div className="absolute top-4 left-4 z-[400] max-w-xs bg-stone-900/90 border border-stone-700/80 rounded-2xl p-3 shadow-xl backdrop-blur-md">
+            <div className="absolute top-16 left-4 z-[400] max-w-xs glass-card !border-emerald-500/40 p-3 shadow-xl">
               <div className="flex items-center justify-between mb-1">
                 <span className="text-xs font-bold text-emerald-400">Prohlížení trasy</span>
                 <button
@@ -272,7 +273,7 @@ export default function App() {
                 </button>
               </div>
               <div className="text-sm font-semibold text-white truncate">{selectedRide.name}</div>
-              <div className="text-xs text-stone-400 mt-0.5">
+              <div className="text-xs text-stone-300 mt-0.5">
                 {selectedRide.distanceKm} km • +{selectedRide.elevationGainM} m • {selectedRide.avgSpeedKmh} km/h
               </div>
             </div>
@@ -281,7 +282,7 @@ export default function App() {
 
         {/* View: History List */}
         {activeTab === 'history' && (
-          <div className="w-full md:w-1/2 h-full bg-stone-950/95 border-l border-stone-800 p-4 sm:p-6 overflow-y-auto z-20">
+          <div className="w-full md:w-1/2 h-full glass-panel !rounded-none !border-y-0 !border-r-0 p-4 sm:p-6 overflow-y-auto z-20">
             <RideHistory
               rides={rides}
               selectedRideId={selectedRide?.id}

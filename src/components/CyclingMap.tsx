@@ -426,9 +426,33 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
       {/* Leaflet Map DOM Element */}
       <div id="cycling-leaflet-map" ref={mapContainerRef} className="w-full h-full z-0 bg-stone-900" />
 
+      {/* Quick Map Tile Switcher (Glassmorphism bar) */}
+      <div className="absolute top-4 left-4 z-[390] flex items-center gap-1 p-1 glass-card !rounded-xl max-w-[calc(100vw-5rem)] overflow-x-auto no-scrollbar shadow-xl">
+        {[
+          { id: 'cyclosm', label: 'Cyklo', icon: '🚴' },
+          { id: 'satellite', label: 'Satelit', icon: '🛰️' },
+          { id: 'satellite_hybrid', label: 'Hybrid', icon: '🌍' },
+          { id: 'topo', label: 'Vrstevnice', icon: '⛰️' },
+        ].map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => onTileProviderChange && onTileProviderChange(item.id as MapTileProvider)}
+            className={`px-2.5 py-1 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+              tileProvider === item.id
+                ? 'bg-emerald-500 text-stone-950 font-bold shadow-md'
+                : 'text-stone-200 hover:text-white hover:bg-white/10'
+            }`}
+          >
+            <span className="text-xs">{item.icon}</span>
+            <span>{item.label}</span>
+          </button>
+        ))}
+      </div>
+
       {/* Planned Route Banner Top Left (if active) */}
       {plannedRoute && (
-        <div className="absolute top-4 left-4 z-[400] max-w-sm bg-stone-900/95 border border-cyan-500/60 rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95">
+        <div className="absolute top-16 left-4 z-[400] max-w-sm glass-card !border-cyan-500/60 p-3 shadow-2xl animate-in fade-in zoom-in-95">
           <div className="flex items-center justify-between gap-2 mb-1">
             <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-xs">
               <Sparkles className="w-3.5 h-3.5" />
@@ -499,16 +523,16 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
             id="btn-map-layers"
             type="button"
             onClick={() => setShowLayerMenu(!showLayerMenu)}
-            title="Přepnout vrstvu mapy"
-            className="p-2.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-100 border border-stone-700 shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer"
+            title="Přepnout vrstvu mapy (Satelitní, Cyklo, Topo)"
+            className="p-2.5 glass-panel text-stone-100 shadow-xl transition-all flex items-center justify-center cursor-pointer hover:!border-emerald-400/50"
           >
             <Layers className="w-5 h-5 text-emerald-400" />
           </button>
 
           {showLayerMenu && (
-            <div className="absolute right-0 mt-2 w-72 bg-stone-900/95 border border-stone-700/80 rounded-2xl p-2 shadow-2xl backdrop-blur-md z-50 animate-in fade-in zoom-in-95">
-              <div className="px-3 py-2 border-b border-stone-800">
-                <span className="text-xs font-semibold uppercase tracking-wider text-stone-400">Veřejné mapové podklady</span>
+            <div className="absolute right-0 mt-2 w-72 glass-modal p-2 shadow-2xl z-50 animate-in fade-in zoom-in-95">
+              <div className="px-3 py-2 border-b border-white/10">
+                <span className="text-xs font-semibold uppercase tracking-wider text-stone-300">Veřejné mapové podklady</span>
               </div>
               <div className="flex flex-col gap-1 mt-1.5">
                 {(Object.keys(TILE_PROVIDERS) as MapTileProvider[]).map((key) => {
@@ -523,7 +547,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
                         setShowLayerMenu(false);
                       }}
                       className={`text-left px-3 py-2.5 rounded-xl transition-all flex flex-col gap-0.5 cursor-pointer ${
-                        isSelected ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'hover:bg-stone-800/80 text-stone-300'
+                        isSelected ? 'bg-emerald-500/20 border border-emerald-500/40 text-emerald-300' : 'hover:bg-white/10 text-stone-300'
                       }`}
                     >
                       <span className="text-sm font-medium flex items-center justify-between">
@@ -546,9 +570,9 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
             type="button"
             onClick={handleFitRoute}
             title="Zobrazit celou projetou trasu"
-            className="p-2.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-100 border border-stone-700 shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer"
+            className="p-2.5 glass-panel text-stone-100 shadow-xl transition-all flex items-center justify-center cursor-pointer hover:!border-white/30"
           >
-            <Maximize2 className="w-5 h-5 text-stone-300" />
+            <Maximize2 className="w-5 h-5 text-stone-200" />
           </button>
         )}
 
@@ -559,7 +583,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
             type="button"
             onClick={handleFitPlanned}
             title="Zobrazit celou naplánovanou trasu"
-            className="p-2.5 rounded-xl bg-cyan-950/90 hover:bg-cyan-900 text-cyan-200 border border-cyan-700 shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer"
+            className="p-2.5 glass-panel text-cyan-200 !border-cyan-500/50 shadow-xl transition-all flex items-center justify-center cursor-pointer hover:!border-cyan-400"
           >
             <Sparkles className="w-5 h-5 text-cyan-400" />
           </button>
@@ -574,7 +598,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
           className={`p-2.5 rounded-xl border shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer ${
             followCyclist
               ? 'bg-emerald-600 text-white border-emerald-500 ring-2 ring-emerald-400/40'
-              : 'bg-stone-900/90 hover:bg-stone-800 text-stone-300 border-stone-700'
+              : 'glass-panel text-stone-200 hover:!border-white/30'
           }`}
         >
           <Locate className={`w-5 h-5 ${followCyclist ? 'animate-pulse' : ''}`} />
@@ -583,7 +607,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
 
       {/* Bottom Floating Elevation Profile Drawer */}
       {plannedRoute && showElevationDrawer && (
-        <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6 z-[400] max-w-xl mx-auto bg-stone-950/95 border border-stone-800 rounded-2xl shadow-2xl p-3 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200">
+        <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6 z-[400] max-w-xl mx-auto glass-panel p-3 shadow-2xl animate-in slide-in-from-bottom-2 duration-200">
           <div className="flex items-center justify-between mb-2">
             <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
               <Mountain className="w-3.5 h-3.5" />
@@ -592,7 +616,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
             <button
               type="button"
               onClick={() => setShowElevationDrawer(false)}
-              className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white cursor-pointer"
+              className="p-1 rounded-lg hover:bg-stone-800/80 text-stone-300 hover:text-white cursor-pointer"
             >
               <ChevronDown className="w-4 h-4" />
             </button>
@@ -607,7 +631,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
 
       {/* Bottom Map Badge showing active public map */}
       <div className="absolute bottom-3 left-3 z-[300] pointer-events-none">
-        <div className="px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 backdrop-blur-sm text-[11px] text-stone-400 flex items-center gap-1.5 shadow-md">
+        <div className="px-2.5 py-1 rounded-lg glass-tile !rounded-lg text-[11px] text-stone-300 flex items-center gap-1.5 shadow-md">
           <Compass className="w-3.5 h-3.5 text-emerald-400" />
           <span>{TILE_PROVIDERS[tileProvider].name.split(' (')[0]}</span>
         </div>

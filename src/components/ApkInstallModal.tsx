@@ -66,10 +66,10 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
   };
 
   return (
-    <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/80 backdrop-blur-sm p-3 sm:p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-lg rounded-2xl bg-stone-900 border border-stone-800 shadow-2xl text-stone-100 flex flex-col max-h-[90vh] overflow-hidden">
+    <div className="fixed inset-0 z-[800] flex items-center justify-center bg-black/75 backdrop-blur-md p-3 sm:p-4 animate-in fade-in duration-200">
+      <div className="w-full max-w-lg glass-modal text-stone-100 flex flex-col max-h-[90vh] overflow-hidden !rounded-2xl">
         {/* Header */}
-        <div className="flex items-center justify-between px-5 py-4 border-b border-stone-800 bg-stone-950/50 shrink-0">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-white/10 bg-stone-950/40 shrink-0">
           <div className="flex items-center gap-3">
             <div className="w-10 h-10 rounded-xl bg-emerald-500/20 border border-emerald-500/40 flex items-center justify-center text-emerald-400 shrink-0 shadow-lg shadow-emerald-950/50">
               <Smartphone className="w-5 h-5" />
@@ -81,13 +81,13 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                   Galaxy S10+
                 </span>
               </div>
-              <p className="text-xs text-stone-400">Instalace do telefonu Samsung Galaxy S10+ / Android</p>
+              <p className="text-xs text-stone-300">Instalace do telefonu Samsung Galaxy S10+ / Android</p>
             </div>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800 transition cursor-pointer"
+            className="p-2 rounded-xl text-stone-400 hover:text-white hover:bg-stone-800/80 transition cursor-pointer"
             aria-label="Zavřít"
           >
             <X className="w-5 h-5" />
@@ -95,7 +95,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-stone-800 bg-stone-950/30 px-3 pt-2 gap-1.5 shrink-0 text-xs">
+        <div className="flex border-b border-white/10 bg-stone-950/30 px-3 pt-2 gap-1.5 shrink-0 text-xs">
           <button
             type="button"
             onClick={() => setActiveTab('install')}
@@ -173,7 +173,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                       Nainstalovat APK do Galaxy S10+
                     </button>
                   ) : (
-                    <div className="p-3 rounded-lg bg-stone-950/80 border border-stone-800 text-[11px] text-stone-300 flex items-center gap-2">
+                    <div className="p-3 glass-tile text-[11px] text-stone-200 flex items-center gap-2">
                       <Info className="w-4 h-4 text-cyan-400 shrink-0" />
                       <span>
                         Pokud jste na počítači, otevřete aplikaci v prohlížeči v telefonu (záložka <strong>QR kód</strong>) a klepněte na <strong>Instalovat</strong>.
@@ -189,7 +189,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                   Jak nainstalovat v prohlížeči na Galaxy S10+:
                 </h4>
 
-                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800/80 space-y-2">
+                <div className="p-3.5 glass-card space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-cyan-500/20 text-cyan-400 flex items-center justify-center font-bold text-[11px]">
                       A
@@ -203,7 +203,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                   </ol>
                 </div>
 
-                <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800/80 space-y-2">
+                <div className="p-3.5 glass-card space-y-2">
                   <div className="flex items-center gap-2">
                     <span className="w-5 h-5 rounded-full bg-emerald-500/20 text-emerald-400 flex items-center justify-center font-bold text-[11px]">
                       B
@@ -219,7 +219,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
               </div>
 
               {/* Samsung S10+ Hardware benefits */}
-              <div className="p-3 rounded-xl bg-stone-950/50 border border-stone-800/70 text-[11px] text-stone-300 flex items-start gap-2.5">
+              <div className="p-3 glass-tile text-[11px] text-stone-300 flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block mb-0.5">Výhody na Samsung Galaxy S10+:</strong>
@@ -239,17 +239,17 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                 <canvas ref={canvasRef} className="mx-auto block" />
               </div>
 
-              <div className="flex items-center gap-2 p-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-300 max-w-md mx-auto">
+              <div className="flex items-center gap-2 p-2 glass-tile text-stone-200 max-w-md mx-auto">
                 <input
                   type="text"
                   readOnly
                   value={currentUrl}
-                  className="bg-transparent border-none text-[11px] text-stone-400 px-2 py-1 flex-1 truncate focus:outline-none"
+                  className="bg-transparent border-none text-[11px] text-stone-300 px-2 py-1 flex-1 truncate focus:outline-none"
                 />
                 <button
                   type="button"
                   onClick={handleCopyLink}
-                  className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-white font-medium text-[11px] flex items-center gap-1 transition cursor-pointer"
+                  className="px-3 py-1.5 rounded-lg bg-stone-800/90 hover:bg-stone-700 text-white font-medium text-[11px] flex items-center gap-1 transition cursor-pointer border border-white/10"
                 >
                   {copied ? (
                     <>
@@ -265,7 +265,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                 </button>
               </div>
 
-              <div className="p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30 text-emerald-300 text-[11px] text-left flex items-start gap-2">
+              <div className="p-3 glass-tile !bg-emerald-950/40 !border-emerald-500/30 text-emerald-300 text-[11px] text-left flex items-start gap-2">
                 <Sparkles className="w-4 h-4 shrink-0 mt-0.5 text-emerald-400" />
                 <span>
                   Po otevření na Galaxy S10+ se v horní části zobrazí tlačítko <strong>„Instalovat APK“</strong>, kterým aplikaci nainstalujete jedním kliknutím přímo na domovskou obrazovku.
@@ -276,7 +276,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
 
           {activeTab === 'package' && (
             <div className="space-y-4">
-              <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-2">
+              <div className="p-3.5 glass-card space-y-2">
                 <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
                   <Download className="w-4 h-4 text-emerald-400" />
                   Stažení instalačního balíčku (.ZIP s manifestem a ikonami)
@@ -294,7 +294,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                 </a>
               </div>
 
-              <div className="p-3.5 rounded-xl bg-stone-950/70 border border-stone-800 space-y-2.5">
+              <div className="p-3.5 glass-card space-y-2.5">
                 <h4 className="font-bold text-white text-xs flex items-center gap-1.5">
                   <ExternalLink className="w-4 h-4 text-cyan-400" />
                   Přímé vygenerování samostatného souboru .APK (PWABuilder)
@@ -310,7 +310,7 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
                 <button
                   type="button"
                   onClick={handlePwaBuilderRedirect}
-                  className="w-full py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-white font-semibold text-xs flex items-center justify-center gap-2 border border-stone-700 transition cursor-pointer"
+                  className="w-full py-2.5 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-white font-semibold text-xs flex items-center justify-center gap-2 border border-white/10 transition cursor-pointer"
                 >
                   <ExternalLink className="w-3.5 h-3.5 text-cyan-400" />
                   Otevřít PWABuilder a vygenerovat .APK
@@ -321,14 +321,14 @@ export const ApkInstallModal: React.FC<ApkInstallModalProps> = ({ isOpen, onClos
         </div>
 
         {/* Footer */}
-        <div className="p-4 border-t border-stone-800 bg-stone-950/60 flex items-center justify-between shrink-0">
+        <div className="p-4 border-t border-white/10 bg-stone-950/40 flex items-center justify-between shrink-0">
           <span className="text-[11px] text-stone-400">
             Optimalizováno pro <strong>Samsung Galaxy S10+</strong> (Android)
           </span>
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-white font-semibold text-xs transition cursor-pointer"
+            className="px-4 py-2 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-white font-semibold text-xs transition cursor-pointer border border-white/10"
           >
             Zavřít
           </button>

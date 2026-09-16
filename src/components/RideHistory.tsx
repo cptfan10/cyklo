@@ -28,30 +28,30 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
   return (
     <div className="flex flex-col gap-4">
       {/* Cumulative Lifetime Stats Banner */}
-      <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-4 shadow-xl">
+      <div className="glass-card p-4 shadow-xl">
         <div className="flex items-center gap-2 mb-3">
           <Award className="w-5 h-5 text-emerald-400" />
-          <h3 className="text-sm font-bold text-stone-200 uppercase tracking-wider">
+          <h3 className="text-sm font-bold text-stone-100 uppercase tracking-wider">
             Celková statistika najetých kilometrů
           </h3>
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
-          <div className="bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60">
-            <span className="text-[11px] text-stone-400 block">Celkem ujeto</span>
+          <div className="glass-tile p-2.5 !rounded-xl">
+            <span className="text-[11px] text-stone-400 block font-medium">Celkem ujeto</span>
             <span className="text-xl font-extrabold font-mono text-emerald-400">{totalKm.toFixed(1)}</span>
             <span className="text-xs text-stone-400 ml-1">km</span>
           </div>
-          <div className="bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60">
-            <span className="text-[11px] text-stone-400 block">Celkový čas</span>
-            <span className="text-lg font-bold font-mono text-stone-100">{formatDuration(totalSeconds)}</span>
+          <div className="glass-tile p-2.5 !rounded-xl">
+            <span className="text-[11px] text-stone-400 block font-medium">Celkový čas</span>
+            <span className="text-lg font-bold font-mono text-white">{formatDuration(totalSeconds)}</span>
           </div>
-          <div className="bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60">
-            <span className="text-[11px] text-stone-400 block">Nastoupáno</span>
+          <div className="glass-tile p-2.5 !rounded-xl">
+            <span className="text-[11px] text-stone-400 block font-medium">Nastoupáno</span>
             <span className="text-xl font-extrabold font-mono text-cyan-400">+{totalClimb}</span>
             <span className="text-xs text-stone-400 ml-1">m</span>
           </div>
-          <div className="bg-stone-950/60 p-2.5 rounded-xl border border-stone-800/60">
-            <span className="text-[11px] text-stone-400 block">Energie</span>
+          <div className="glass-tile p-2.5 !rounded-xl">
+            <span className="text-[11px] text-stone-400 block font-medium">Energie</span>
             <span className="text-xl font-extrabold font-mono text-orange-400">{totalCalories}</span>
             <span className="text-xs text-stone-400 ml-1">kcal</span>
           </div>
@@ -60,8 +60,8 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
 
       {/* Rides List */}
       <div className="space-y-2.5">
-        <div className="flex items-center justify-between text-xs text-stone-400 px-1">
-          <span className="font-semibold uppercase tracking-wider">Zaznamenané trasy ({rides.length})</span>
+        <div className="flex items-center justify-between text-xs text-stone-300 px-1">
+          <span className="font-semibold uppercase tracking-wider text-stone-200">Zaznamenané trasy ({rides.length})</span>
           <div className="flex items-center gap-2">
             {rides.length > 0 && onClearAll && (
               <button
@@ -77,7 +77,7 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
         </div>
 
         {rides.length === 0 ? (
-          <div className="p-8 bg-stone-900/60 border border-stone-800 rounded-2xl text-center text-stone-400 text-sm">
+          <div className="p-8 glass-card text-center text-stone-300 text-sm">
             Zatím nemáte žádné uložené trasy. Spusťte živý záznam nebo vyzkoušejte simulaci.
           </div>
         ) : (
@@ -87,10 +87,10 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
               <div
                 key={ride.id}
                 onClick={() => onSelectRide(ride)}
-                className={`p-4 rounded-2xl border transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
+                className={`p-4 glass-card transition-all cursor-pointer flex flex-col sm:flex-row sm:items-center justify-between gap-3 ${
                   isSelected
-                    ? 'bg-stone-900 border-emerald-500/80 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40'
-                    : 'bg-stone-900/70 hover:bg-stone-900 border-stone-800'
+                    ? '!border-emerald-500/80 shadow-lg shadow-emerald-500/10 ring-1 ring-emerald-500/40'
+                    : 'hover:!border-white/20'
                 }`}
               >
                 <div className="flex-1 min-w-0">

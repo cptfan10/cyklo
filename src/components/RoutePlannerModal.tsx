@@ -46,16 +46,16 @@ export const RoutePlannerModal: React.FC<RoutePlannerModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-[550] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/80 backdrop-blur-md animate-in fade-in duration-200">
+    <div className="fixed inset-0 z-[550] flex items-center justify-center p-2 sm:p-4 md:p-6 bg-black/75 backdrop-blur-md animate-in fade-in duration-200">
       <div
-        className={`relative w-full bg-stone-900 border border-stone-700/80 rounded-3xl shadow-2xl overflow-hidden flex flex-col transition-all duration-300 ${
+        className={`relative w-full glass-modal overflow-hidden flex flex-col transition-all duration-300 ${
           isMaximized
-            ? 'h-[98vh] max-w-[98vw] rounded-2xl'
-            : 'h-[90vh] max-w-5xl rounded-3xl'
+            ? 'h-[98vh] max-w-[98vw] !rounded-2xl'
+            : 'h-[90vh] max-w-5xl !rounded-2xl'
         }`}
       >
         {/* Window Header Bar */}
-        <div className="h-14 px-4 sm:px-6 bg-stone-950/90 border-b border-stone-800 flex items-center justify-between shrink-0 select-none">
+        <div className="h-14 px-4 sm:px-6 bg-stone-950/40 border-b border-white/10 flex items-center justify-between shrink-0 select-none">
           <div className="flex items-center gap-2.5 min-w-0">
             <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-500 to-teal-400 flex items-center justify-center text-stone-950 shadow-md shadow-cyan-500/20 shrink-0">
               <Sparkles className="w-4 h-4 fill-stone-950" />
@@ -72,13 +72,13 @@ export const RoutePlannerModal: React.FC<RoutePlannerModalProps> = ({
 
           {/* Quick Route Notification Bar if selected */}
           {lastSelectedRouteName && (
-            <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full bg-cyan-500/15 border border-cyan-500/30 text-xs text-cyan-300 animate-in fade-in">
+            <div className="hidden lg:flex items-center gap-2 px-3 py-1 rounded-full glass-tile !p-1.5 !px-3 !border-cyan-500/30 text-xs text-cyan-300 animate-in fade-in">
               <Check className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="truncate max-w-xs font-medium">Vybráno: {lastSelectedRouteName}</span>
+              <span className="truncate max-w-xs font-medium text-white">Vybráno: {lastSelectedRouteName}</span>
               <button
                 type="button"
                 onClick={onClose}
-                className="ml-1 text-[11px] font-bold text-cyan-200 hover:text-white underline cursor-pointer"
+                className="ml-1 text-[11px] font-bold text-cyan-300 hover:text-white underline cursor-pointer"
               >
                 Přejít na mapu
               </button>

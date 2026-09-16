@@ -20,29 +20,29 @@ export const GalaxyS10HelperModal: React.FC = () => {
       </button>
 
       {isOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm p-4 animate-in fade-in">
-          <div className="w-full max-w-md rounded-2xl bg-stone-900 border border-stone-800 p-5 shadow-2xl text-stone-200">
-            <div className="flex items-center justify-between pb-3 border-b border-stone-800">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/75 backdrop-blur-md p-4 animate-in fade-in">
+          <div className="w-full max-w-md glass-modal p-5 shadow-2xl text-stone-100">
+            <div className="flex items-center justify-between pb-3 border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <div className="w-9 h-9 rounded-xl bg-cyan-500/20 border border-cyan-500/30 flex items-center justify-center text-cyan-400">
                   <Smartphone className="w-5 h-5" />
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-white">Samsung Galaxy S10+ Režim</h3>
-                  <p className="text-[11px] text-stone-400">Nastavení pro jízdu na kole na řídítkách</p>
+                  <p className="text-[11px] text-stone-300">Nastavení pro jízdu na kole na řídítkách</p>
                 </div>
               </div>
               <button
                 type="button"
                 onClick={() => setIsOpen(false)}
-                className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800 cursor-pointer"
+                className="p-1.5 rounded-lg text-stone-400 hover:text-white hover:bg-stone-800/80 cursor-pointer"
               >
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            <div className="my-4 space-y-3 text-xs text-stone-300 max-h-[60vh] overflow-y-auto pr-1">
-              <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800 flex items-start gap-2.5">
+            <div className="my-4 space-y-3 text-xs text-stone-200 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="glass-tile p-3 flex items-start gap-2.5">
                 <Sun className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block mb-0.5">Trvalé rozsvícení displeje (Wake Lock):</strong>
@@ -50,7 +50,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800 flex items-start gap-2.5">
+              <div className="glass-tile p-3 flex items-start gap-2.5">
                 <BatteryCharging className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block mb-0.5">AMOLED Pure Dark šetří baterii:</strong>
@@ -58,7 +58,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800 flex items-start gap-2.5">
+              <div className="glass-tile p-3 flex items-start gap-2.5">
                 <ShieldCheck className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
                 <div>
                   <strong className="text-white block mb-0.5">Ovládání i v cyklistických rukavicích:</strong>
@@ -66,7 +66,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
                 </div>
               </div>
 
-              <div className="bg-stone-950/70 p-3 rounded-xl border border-stone-800 flex items-start gap-2.5">
+              <div className="glass-tile p-3 flex items-start gap-2.5">
                 <Download className="w-4 h-4 text-emerald-400 shrink-0 mt-0.5" />
                 <div className="flex-1">
                   <strong className="text-white block mb-0.5">Nativní WebAPK instalace:</strong>
@@ -89,7 +89,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
             <button
               type="button"
               onClick={() => setIsOpen(false)}
-              className="w-full py-2.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 font-bold text-xs transition cursor-pointer"
+              className="w-full py-2.5 rounded-xl bg-stone-800/90 hover:bg-stone-700 text-stone-100 font-bold text-xs transition cursor-pointer border border-white/10"
             >
               Rozumím a zpět do jízdy
             </button>

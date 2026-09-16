@@ -88,7 +88,7 @@ export const RouteElevationProfile: React.FC<RouteElevationProfileProps> = ({
   const calculatedTimeMin = Math.round((route.distanceKm / estimatedSpeedKmh) * 60);
 
   return (
-    <div className="w-full bg-stone-900/90 border border-stone-800 rounded-2xl p-3 sm:p-4 text-stone-200">
+    <div className="w-full glass-card p-3 sm:p-4 text-stone-100">
       {/* Header bar with stats */}
       <div className="flex items-center justify-between gap-2 mb-2.5 flex-wrap">
         <div className="flex items-center gap-2">
@@ -101,16 +101,16 @@ export const RouteElevationProfile: React.FC<RouteElevationProfileProps> = ({
               {route.difficulty && (
                 <span className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                   route.difficulty === 'Lehká'
-                    ? 'bg-emerald-950 text-emerald-300 border border-emerald-800/50'
+                    ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/50'
                     : route.difficulty === 'Střední'
-                    ? 'bg-cyan-950 text-cyan-300 border border-cyan-800/50'
-                    : 'bg-amber-950 text-amber-300 border border-amber-800/50'
+                    ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/50'
+                    : 'bg-amber-950/80 text-amber-300 border border-amber-800/50'
                 }`}>
                   {route.difficulty}
                 </span>
               )}
             </h5>
-            <span className="text-[11px] text-stone-400">
+            <span className="text-[11px] text-stone-300">
               Min {minAlt} m • Max {maxAlt} m n.m.
             </span>
           </div>
@@ -118,19 +118,19 @@ export const RouteElevationProfile: React.FC<RouteElevationProfileProps> = ({
 
         {/* Quick ride metrics */}
         <div className="flex items-center gap-2 text-xs font-mono">
-          <div className="px-2 py-1 rounded-lg bg-stone-950/70 border border-stone-800 text-stone-300 flex items-center gap-1">
+          <div className="px-2 py-1 rounded-lg glass-tile !p-1.5 !rounded-lg text-stone-200 flex items-center gap-1">
             <TrendingUp className="w-3 h-3 text-emerald-400" />
-            <span>+{route.elevationGainM} m</span>
+            <span className="font-bold text-white">+{route.elevationGainM} m</span>
           </div>
-          <div className="px-2 py-1 rounded-lg bg-stone-950/70 border border-stone-800 text-stone-300 flex items-center gap-1">
+          <div className="px-2 py-1 rounded-lg glass-tile !p-1.5 !rounded-lg text-stone-200 flex items-center gap-1">
             <Clock className="w-3 h-3 text-cyan-400" />
-            <span>{Math.floor(calculatedTimeMin / 60)}h {calculatedTimeMin % 60}m</span>
+            <span className="font-bold text-white">{Math.floor(calculatedTimeMin / 60)}h {calculatedTimeMin % 60}m</span>
           </div>
         </div>
       </div>
 
       {/* Interactive SVG Chart */}
-      <div className="relative w-full overflow-hidden select-none bg-stone-950/60 rounded-xl p-1 border border-stone-800/80">
+      <div className="relative w-full overflow-hidden select-none bg-stone-950/60 rounded-xl p-1 border border-white/10">
         <svg
           viewBox={`0 0 ${svgWidth} ${svgHeight}`}
           className="w-full h-auto cursor-crosshair block"
@@ -257,7 +257,7 @@ export const RouteElevationProfile: React.FC<RouteElevationProfileProps> = ({
 
         {/* Hover info badge floating on chart */}
         {activePoint && (
-          <div className="absolute top-2 right-2 bg-stone-950/95 border border-cyan-500/50 rounded-lg px-2.5 py-1 text-xs font-mono shadow-lg flex items-center gap-3">
+          <div className="absolute top-2 right-2 glass-tile !rounded-lg px-2.5 py-1 text-xs font-mono !border-cyan-500/40 flex items-center gap-3">
             <div>
               <span className="text-stone-400 text-[10px] block">Pozice</span>
               <span className="font-bold text-white">{activePoint.distanceKm} km</span>
