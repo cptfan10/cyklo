@@ -5,13 +5,14 @@ import { RideAnalysisModal } from './components/RideAnalysisModal';
 import { AiCoachDrawer } from './components/AiCoachDrawer';
 import { RideHistory } from './components/RideHistory';
 import { RoutePlannerAssistant } from './components/RoutePlannerAssistant';
+import { HandlebarCockpitModal } from './components/HandlebarCockpitModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { GalaxyS10HelperModal } from './components/GalaxyS10HelperModal';
 import { useRideRecorder } from './hooks/useRideRecorder';
 import { useWakeLock } from './hooks/useWakeLock';
 import { RideData, MapTileProvider, GpsPoint, PlannedRoute } from './types';
 import { INITIAL_PRESET_RIDES } from './utils/geoUtils';
-import { Bike, Sparkles, History, Compass, Layers, Info, Map as MapIcon, Route } from 'lucide-react';
+import { Bike, Sparkles, History, Compass, Layers, Info, Map as MapIcon, Route, Smartphone } from 'lucide-react';
 
 const STORAGE_KEY_RIDES = 'cyklo_asistent_rides_v1';
 
@@ -41,12 +42,16 @@ export default function App() {
   const [keepScreenOn, setKeepScreenOn] = useState<boolean>(false);
   const wakeLock = useWakeLock(recorder.status === 'recording' || keepScreenOn);
 
-  // Planned route from AI Assistant
+  // Planned route from AI Assistant / Curated routes
   const [plannedRoute, setPlannedRoute] = useState<PlannedRoute | null>(null);
+
+  // Hover distance along route for elevation scrub synchronization with map
+  const [hoveredRouteDistance, setHoveredRouteDistance] = useState<number | null>(null);
 
   // Modals & Drawers
   const [analysisModalRide, setAnalysisModalRide] = useState<RideData | null>(null);
   const [isCoachDrawerOpen, setIsCoachDrawerOpen] = useState<boolean>(false);
+  const [isCockpitOpen, setIsCockpitOpen] = useState<boolean>(false);
 
   // Map settings
   const [tileProvider, setTileProvider] = useState<MapTileProvider>('cyclosm');
@@ -96,11 +101,11 @@ export default function App() {
     }
   };
 
-  // When user selects a route from the Route Planner chat
-  const handleSelectRouteFromPlanner = (route: PlannedRoute) => {
+  // When user selects a route from the Route Planner chat or catalog
+  const handleSelectRouteFromPlanner = (route: PlannedRoute, switchView = false) => {
     setPlannedRoute(route);
-    // On small devices, auto-switch to map view so the user can inspect it
-    if (window.innerWidth < 768) {
+    // Only switch to map view on mobile if user explicitly clicked "Zobrazit na mapě"
+    if (switchView && window.innerWidth < 768) {
       setActiveTab('live');
     }
   };
@@ -154,7 +159,7 @@ export default function App() {
               onClick={() => setActiveTab('live')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'live'
-                  ? 'bg-emerald-500 text-stone-950 shadow-sm'
+                  ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
@@ -169,7 +174,7 @@ export default function App() {
               onClick={() => setActiveTab('planner')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'planner'
-                  ? 'bg-cyan-500 text-stone-950 shadow-sm'
+                  ? 'bg-cyan-500 text-stone-950 shadow-sm font-bold'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
@@ -185,7 +190,7 @@ export default function App() {
               onClick={() => setActiveTab('history')}
               className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
                 activeTab === 'history'
-                  ? 'bg-emerald-500 text-stone-950 shadow-sm'
+                  ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
                   : 'text-stone-400 hover:text-stone-200'
               }`}
             >
@@ -228,6 +233,8 @@ export default function App() {
             currentLocation={currentActiveLocation}
             plannedRoute={plannedRoute}
             onClearPlannedRoute={() => setPlannedRoute(null)}
+            onReversePlannedRoute={(reversed) => setPlannedRoute(reversed)}
+            hoveredRouteDistanceKm={hoveredRouteDistance}
             isRecording={recorder.status === 'recording'}
             followCyclist={followCyclist}
             onToggleFollow={() => setFollowCyclist(!followCyclist)}
@@ -259,13 +266,29 @@ export default function App() {
 
         {/* View: AI Route Planner Assistant */}
         {activeTab === 'planner' && (
-          <div className="w-full md:w-1/2 lg:w-2/5 h-full bg-stone-950 border-l border-stone-800 z-20 flex flex-col">
+          <div className="w-full md:w-1/2 lg:w-2/5 h-full bg-stone-950 border-l border-stone-800 z-20 flex flex-col relative">
             <RoutePlannerAssistant
               currentLocation={currentActiveLocation}
               onSelectRouteOnMap={handleSelectRouteFromPlanner}
               onStartRideWithRoute={handleStartRideWithRoute}
+              activePlannedRoute={plannedRoute}
               activePlannedRouteId={plannedRoute?.id}
+              onHoverRouteDistance={setHoveredRouteDistance}
             />
+
+            {/* Mobile quick switch button to see the map if a route is selected */}
+            {plannedRoute && (
+              <div className="md:hidden absolute bottom-24 right-4 z-30">
+                <button
+                  type="button"
+                  onClick={() => setActiveTab('live')}
+                  className="px-3.5 py-2.5 rounded-2xl bg-cyan-500 text-stone-950 font-bold text-xs shadow-2xl flex items-center gap-2 border border-cyan-300 animate-bounce"
+                >
+                  <MapIcon className="w-4 h-4" />
+                  <span>Zobrazit trasu na mapě</span>
+                </button>
+              </div>
+            )}
           </div>
         )}
 
@@ -314,6 +337,7 @@ export default function App() {
               wakeLock.requestLock();
             }
           }}
+          onOpenCockpit={() => setIsCockpitOpen(true)}
           onStart={handleStartRide}
           onPause={recorder.pauseRide}
           onResume={recorder.resumeRide}
@@ -321,6 +345,35 @@ export default function App() {
           onReset={recorder.resetRide}
         />
       </footer>
+
+      {/* Fullscreen AMOLED Handlebar Cockpit Modal */}
+      <HandlebarCockpitModal
+        isOpen={isCockpitOpen}
+        onClose={() => setIsCockpitOpen(false)}
+        status={recorder.status}
+        distanceKm={recorder.distanceKm}
+        durationSeconds={recorder.durationSeconds}
+        currentSpeedKmh={recorder.currentSpeedKmh}
+        avgSpeedKmh={recorder.avgSpeedKmh}
+        maxSpeedKmh={recorder.maxSpeedKmh}
+        elevationGainM={recorder.elevationGainM}
+        currentElevationM={recorder.currentElevationM}
+        caloriesBurned={recorder.caloriesBurned}
+        plannedRoute={plannedRoute}
+        onPause={recorder.pauseRide}
+        onResume={recorder.resumeRide}
+        onFinish={handleFinishRide}
+        isWakeLocked={wakeLock.isLocked}
+        onToggleWakeLock={() => {
+          if (wakeLock.isLocked) {
+            setKeepScreenOn(false);
+            wakeLock.releaseLock();
+          } else {
+            setKeepScreenOn(true);
+            wakeLock.requestLock();
+          }
+        }}
+      />
 
       {/* Modals and Drawers */}
       {analysisModalRide && (

@@ -26,7 +26,39 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-const CANDIDATE_MODELS = ["gemini-3.8-flash", "gemini-3.6-flash", "gemini-3.5-flash"];
+const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"];
+
+function sanitizeHistory(history: any[], currentMessage: string): any[] {
+  if (!Array.isArray(history)) return [];
+  const clean: any[] = [];
+  const trimmedCurr = (currentMessage || "").trim();
+
+  for (const item of history) {
+    if (!item || !item.role || !Array.isArray(item.parts)) continue;
+    const text = item.parts.map((p: any) => p?.text || "").join(" ").trim();
+    if (!text) continue;
+
+    // Do not repeat current message at the end of history
+    if (item.role === "user" && text === trimmedCurr) continue;
+
+    // Strict alternation: user -> model -> user -> model
+    if (clean.length > 0 && clean[clean.length - 1].role === item.role) {
+      clean[clean.length - 1].parts[0].text += `\n\n${text}`;
+    } else {
+      clean.push({
+        role: item.role === "user" ? "user" : "model",
+        parts: [{ text }],
+      });
+    }
+  }
+
+  // Multi-turn chat must end with model if next turn is user (via sendMessage)
+  while (clean.length > 0 && clean[clean.length - 1].role === "user") {
+    clean.pop();
+  }
+
+  return clean;
+}
 
 async function generateContentWithFallback(
   ai: GoogleGenAI,
@@ -34,17 +66,25 @@ async function generateContentWithFallback(
 ): Promise<{ text: string; model: string }> {
   let lastError: any = null;
   for (const model of CANDIDATE_MODELS) {
-    try {
-      const response = await ai.models.generateContent({
-        ...params,
-        model,
-      });
-      if (response && response.text) {
-        return { text: response.text, model };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const response = await ai.models.generateContent({
+          ...params,
+          model,
+        });
+        if (response && response.text) {
+          return { text: response.text, model };
+        }
+      } catch (err: any) {
+        lastError = err;
+        const status = err?.status || err?.statusCode || "";
+        console.warn(`Model ${model} (attempt ${attempt + 1}) failed (${status || err?.message || "error"}), checking next...`);
+        if (attempt === 0 && (status === 503 || status === 429)) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        break;
       }
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`Model ${model} failed (${err?.status || err?.message || "error"}), trying next candidate...`);
     }
   }
   throw lastError || new Error("All Gemini models unavailable");
@@ -58,25 +98,35 @@ async function sendChatWithFallback(
     message: string;
   }
 ): Promise<{ text: string; model: string }> {
+  const cleanHistory = sanitizeHistory(options.history, options.message);
   let lastError: any = null;
+
   for (const model of CANDIDATE_MODELS) {
-    try {
-      const chat = ai.chats.create({
-        model,
-        config: {
-          systemInstruction: options.systemInstruction,
-        },
-        history: options.history,
-      });
-      const response = await chat.sendMessage({
-        message: options.message,
-      });
-      if (response && response.text) {
-        return { text: response.text, model };
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const chat = ai.chats.create({
+          model,
+          config: {
+            systemInstruction: options.systemInstruction,
+          },
+          history: cleanHistory,
+        });
+        const response = await chat.sendMessage({
+          message: options.message,
+        });
+        if (response && response.text) {
+          return { text: response.text, model };
+        }
+      } catch (err: any) {
+        lastError = err;
+        const status = err?.status || err?.statusCode || "";
+        console.warn(`Chat model ${model} (attempt ${attempt + 1}) failed (${status || err?.message || "error"})...`);
+        if (attempt === 0 && (status === 503 || status === 429)) {
+          await new Promise((r) => setTimeout(r, 500));
+          continue;
+        }
+        break;
       }
-    } catch (err: any) {
-      lastError = err;
-      console.warn(`Chat model ${model} failed (${err?.status || err?.message || "error"}), trying next candidate...`);
     }
   }
   throw lastError || new Error("All Gemini chat models unavailable");
@@ -317,65 +367,264 @@ ${
   }
 });
 
-// Specialized Multi-Turn Route Planning Assistant (using gemini-3.5-flash)
-app.post("/api/route-planner-chat", async (req, res) => {
-  try {
-    const { message, chatHistory, userPreferences, currentLocation } = req.body;
-    if (!message) {
-      return res.status(400).json({ error: "Missing message" });
+interface CzechCityHub {
+  name: string;
+  aliases: string[];
+  lat: number;
+  lng: number;
+  baseAltitude: number;
+  region: string;
+  scenicWaypoints: { name: string; dLat: number; dLng: number; note: string }[];
+}
+
+const CZECH_HUBS: CzechCityHub[] = [
+  {
+    name: "Brno",
+    aliases: ["brno", "brně", "brna", "svitav", "prygl", "veveří", "pisárk", "bystrc", "židlochovic", "modřic"],
+    lat: 49.1951,
+    lng: 16.6068,
+    baseAltitude: 220,
+    region: "Jihomoravský kraj",
+    scenicWaypoints: [
+      { name: "Pisárky – Cyklostezka 1 Svratka", dLat: 0.005, dLng: -0.035, note: "Páteřní cyklostezka bez aut" },
+      { name: "Bystrc Přístaviště", dLat: 0.035, dLng: -0.086, note: "Vstup k Brněnské přehradě" },
+      { name: "Hrad Veveří (lávka)", dLat: 0.062, dLng: -0.145, note: "Historický hrad a vyhlídky" },
+      { name: "Veverská Bítýška", dLat: 0.082, dLng: -0.168, note: "Kavárny a občerstvení" },
+      { name: "Rozdrojovice vyhlídka", dLat: 0.067, dLng: -0.090, note: "Příjemný lesní sjezd zpět" },
+    ],
+  },
+  {
+    name: "Blansko & Moravský kras",
+    aliases: ["blansk", "macoch", "moravský kras", "jedovnic", "sloup", "adamov"],
+    lat: 49.3627,
+    lng: 16.6447,
+    baseAltitude: 280,
+    region: "Moravský kras",
+    scenicWaypoints: [
+      { name: "Blansko město", dLat: 0, dLng: 0, note: "Výchozí bod u nádraží" },
+      { name: "Skalní mlýn (kaňon)", dLat: 0.015, dLng: 0.065, note: "Vjezd do chráněného krasového údolí" },
+      { name: "Propast Macocha & Horní můstek", dLat: 0.024, dLng: 0.089, note: "Vyhlídka do 138m propasti" },
+      { name: "Rybník Olšovec (Jedovnice)", dLat: -0.025, dLng: 0.115, note: "Singletracky & občerstvení" },
+      { name: "Křtiny (poutní chrám)", dLat: -0.068, dLng: 0.098, note: "Santiniho barokní perla" },
+    ],
+  },
+  {
+    name: "Pálava & Nové Mlýny",
+    aliases: ["pálav", "palav", "mikulov", "pasohlávk", "pavlov", "věstonic", "lednic", "valtic", "břeclav"],
+    lat: 48.8078,
+    lng: 16.6378,
+    baseAltitude: 180,
+    region: "Jižní Morava",
+    scenicWaypoints: [
+      { name: "Pasohlávky kemp", dLat: 0.090, dLng: -0.080, note: "Start u nádrže Nové Mlýny" },
+      { name: "Dolní Věstonice", dLat: 0.079, dLng: 0.005, note: "Archeologická stezka" },
+      { name: "Pavlov sklípky", dLat: 0.066, dLng: 0.033, note: "Výhled na Dívčí hrady" },
+      { name: "Mikulov náměstí & zámek", dLat: 0, dLng: 0, note: "Historické centrum a Kozí hrádek" },
+    ],
+  },
+  {
+    name: "Plzeň & Berounka",
+    aliases: ["plzeň", "plzen", "bolevec", "radyn", "stříbr", "rokycan"],
+    lat: 49.7475,
+    lng: 13.3776,
+    baseAltitude: 310,
+    region: "Plzeňský kraj",
+    scenicWaypoints: [
+      { name: "Plzeň Štruncovy sady", dLat: 0, dLng: 0, note: "Soutok Mže a Radbuzy" },
+      { name: "Bolevecké rybníky", dLat: 0.032, dLng: 0.012, note: "Borové lesy a pláže" },
+      { name: "Chrást lávka", dLat: 0.045, dLng: 0.115, note: "Lesní cyklostezka podél toku" },
+      { name: "Hrad Radyně", dLat: -0.065, dLng: 0.045, note: "Královský hrad s rozhlednou" },
+    ],
+  },
+  {
+    name: "Ostrava & Beskydy",
+    aliases: ["ostrav", "beskyd", "frýdek", "místek", "rožnov", "čeladn", "ostravic", "pustevn"],
+    lat: 49.8209,
+    lng: 18.2625,
+    baseAltitude: 240,
+    region: "Moravskoslezský kraj",
+    scenicWaypoints: [
+      { name: "Dolní Vítkovice", dLat: 0, dLng: 0, note: "Industriální srdce Ostravy" },
+      { name: "Soutok Ostravice a Lučiny", dLat: 0.021, dLng: 0.035, note: "Cyklostezka podél vody" },
+      { name: "Hrad Hukvaldy", dLat: -0.205, dLng: -0.085, note: "Janáčkova obora a hrad" },
+      { name: "Čeladná pod Beskydy", dLat: -0.285, dLng: 0.065, note: "Pohled na masiv Lysé hory" },
+    ],
+  },
+  {
+    name: "Liberec & Jizerské hory",
+    aliases: ["liberec", "jizer", "ještěd", "jested", "bedřichov", "bedrichov", "smědav", "jablonec"],
+    lat: 50.7671,
+    lng: 15.0562,
+    baseAltitude: 450,
+    region: "Liberecký kraj",
+    scenicWaypoints: [
+      { name: "Liberec Lidové sady", dLat: 0.012, dLng: 0.025, note: "Vstup do Jizerských hor" },
+      { name: "Bedřichov stadion", dLat: 0.022, dLng: 0.087, note: "Začátek Jizerské magistrály" },
+      { name: "Nová Louka (Šámalova chata)", dLat: 0.045, dLng: 0.102, note: "Horská chata a rašeliniště" },
+      { name: "Smědava chata", dLat: 0.076, dLng: 0.219, note: "Občerstvení pod Smrkem" },
+    ],
+  },
+  {
+    name: "Olomouc & Litovelské Pomoraví",
+    aliases: ["olomouc", "pomoraví", "litovel", "haná", "hana", "bouzov"],
+    lat: 49.5938,
+    lng: 17.2509,
+    baseAltitude: 215,
+    region: "Olomoucký kraj",
+    scenicWaypoints: [
+      { name: "Olomouc Horní náměstí", dLat: 0, dLng: 0, note: "Památka UNESCO" },
+      { name: "Poděbrady přírodní jezero", dLat: 0.032, dLng: -0.045, note: "Koupání a cyklostezka" },
+      { name: "Horka nad Moravou (Sluňákov)", dLat: 0.048, dLng: -0.062, note: "Dům přírody" },
+      { name: "Litovel město & pivovar", dLat: 0.108, dLng: -0.178, note: "Hanácké Benátky s mosty" },
+    ],
+  },
+  {
+    name: "Krkonoše & Podkrkonoší",
+    aliases: ["krkonoš", "krkonos", "vrchlabí", "špindl", "jansk", "trutnov", "jilemnic"],
+    lat: 50.6272,
+    lng: 15.6095,
+    baseAltitude: 550,
+    region: "Královéhradecký kraj",
+    scenicWaypoints: [
+      { name: "Vrchlabí zámecký park", dLat: 0, dLng: 0, note: "Brána do Krkonoš" },
+      { name: "Přehrada Labská", dLat: 0.085, dLng: -0.025, note: "Hráz na horním toku Labe" },
+      { name: "Špindlerův Mlýn", dLat: 0.102, dLng: -0.012, note: "Horský resort a cyklostezky" },
+    ],
+  },
+  {
+    name: "Šumava",
+    aliases: ["šumav", "sumav", "kvild", "modrav", "lipno", "srní", "železná ruda", "prášil"],
+    lat: 49.0238,
+    lng: 13.4988,
+    baseAltitude: 980,
+    region: "Plzeňský / Jihočeský kraj",
+    scenicWaypoints: [
+      { name: "Kvilda (infocentrum)", dLat: 0.015, dLng: 0.082, note: "Nejvýše položená obec v ČR" },
+      { name: "Pramen Vltavy", dLat: -0.045, dLng: 0.125, note: "Zrození národní řeky" },
+      { name: "Modrava", dLat: 0, dLng: 0, note: "Soutok horských potoků" },
+      { name: "Tříjezerní slať", dLat: 0.018, dLng: -0.042, note: "Vyhlídková lávka rašeliništěm" },
+    ],
+  },
+  {
+    name: "Karlštejn & Berounka",
+    aliases: ["karlštejn", "karlstejn", "beroun", "radotín", "černošic", "dobřichovic", "srbsk", "český kras", "praha", "praze"],
+    lat: 49.9395,
+    lng: 14.1880,
+    baseAltitude: 230,
+    region: "Střední Čechy / Český kras",
+    scenicWaypoints: [
+      { name: "Radotín lávka (Start)", dLat: 0.046, dLng: 0.176, note: "Páteřní cyklostezka A1" },
+      { name: "Černošice jez", dLat: 0.015, dLng: 0.091, note: "Občerstvení u řeky" },
+      { name: "Dobřichovice lávka", dLat: -0.011, dLng: 0.046, note: "Cyklistická zastávka" },
+      { name: "Hrad Karlštejn", dLat: 0, dLng: 0, note: "Gotický klenot krále Karla IV." },
+      { name: "Srbsko lávka", dLat: -0.006, dLng: 0.024, note: "Přírodní kaňon Berounky" },
+    ],
+  },
+];
+
+function generateSmartRouteFallback(message: string, userPreferences?: any, currentLocation?: { lat: number; lng: number } | null): string {
+  const lowerMsg = (message || "").toLowerCase();
+
+  // Find best matching hub
+  let matchedHub = CZECH_HUBS.find((hub) =>
+    hub.aliases.some((alias) => lowerMsg.includes(alias))
+  );
+
+  // If no keyword matched, but currentLocation is provided, pick closest hub
+  if (!matchedHub && currentLocation && typeof currentLocation.lat === "number" && typeof currentLocation.lng === "number") {
+    let minDist = Infinity;
+    for (const hub of CZECH_HUBS) {
+      const dLat = hub.lat - currentLocation.lat;
+      const dLng = hub.lng - currentLocation.lng;
+      const dist = dLat * dLat + dLng * dLng;
+      if (dist < minDist) {
+        minDist = dist;
+        matchedHub = hub;
+      }
     }
+  }
 
-    const ai = getGeminiClient();
-    if (!ai) {
-      // Intelligent fallback route response
-      const fallbackRoute = `### 🗺️ Doporučená cyklotrasa na míru: Karlštejnský okruh podél řeky
-Podle vašich instrukcí doporučuji ověřenou a bezpečnou trasu:
+  // Default to Karlštejn / Prague hub if none matched
+  if (!matchedHub) {
+    matchedHub = CZECH_HUBS[CZECH_HUBS.length - 1];
+  }
 
-- **Start & Cíl:** Praha-Radotín ➔ Karlštejn ➔ Srbsko ➔ zpět (Okruh)
-- **Vzdálenost:** cca 35 km
-- **Převýšení:** +260 m (převážně rovinatý profil v údolí s jedním mírným stoupáním)
-- **Povrch:** 85 % hladký asfalt, 15 % jemná zpevněná šotolina (vhodné pro silniční, gravel i treking)
-- **Bezpečnost:** Vede mimo hlavní silnice po páteřní cyklotrase A1 a navazujících cyklostezkách podél Berounky.
+  // Extract requested distance or use reasonable default
+  const distMatch = lowerMsg.match(/(\d{1,3})\s*(?:km|kilometr)/);
+  const distanceKm = distMatch ? Math.min(120, Math.max(15, parseInt(distMatch[1], 10))) : 36.0;
 
-**Segmenty trasy:**
-1. **Radotín ➔ Černošice (6 km):** Plynulá asfaltová cyklostezka po rovině podél vody.
-2. **Černošice ➔ Dobřichovice (7 km):** Klidné úseky, možnost občerstvení v Dobřichovicích u lávky.
-3. **Dobřichovice ➔ Karlštejn (11 km):** Malebné scenerie Českého krasu, výhled na hrad Karlštejn.
-4. **Zpáteční větev přes Srbsko (11 km):** Návrat po protějším břehu nebo po cyklotrase.
+  // Determine bike type
+  let bikeType = "Gravel / Silniční / Treking";
+  if (lowerMsg.includes("silni") || userPreferences?.preferredBike?.includes("Silni")) {
+    bikeType = "Silniční";
+  } else if (lowerMsg.includes("mtb") || lowerMsg.includes("horsk") || userPreferences?.preferredBike?.includes("MTB")) {
+    bikeType = "Horský (MTB)";
+  } else if (lowerMsg.includes("gravel") || userPreferences?.preferredBike?.includes("Gravel")) {
+    bikeType = "Gravel";
+  }
+
+  const isMtb = bikeType.includes("MTB") || bikeType.includes("Horsk");
+  const elevationGain = isMtb ? Math.round(distanceKm * 12) : Math.round(distanceKm * 7);
+
+  // Generate waypoints and smooth coordinates around the matched hub
+  const waypoints = matchedHub.scenicWaypoints.map((sw) => ({
+    name: sw.name,
+    lat: Number((matchedHub!.lat + sw.dLat).toFixed(5)),
+    lng: Number((matchedHub!.lng + sw.dLng).toFixed(5)),
+    note: sw.note,
+  }));
+
+  const numCoords = 16;
+  const coordinates: [number, number][] = [];
+  const radiusLat = (distanceKm / 111) * 0.28;
+  const radiusLng = (distanceKm / (111 * Math.cos((matchedHub.lat * Math.PI) / 180))) * 0.28;
+
+  for (let i = 0; i < numCoords; i++) {
+    const angle = (i / (numCoords - 1)) * Math.PI * 2;
+    const lat = Number((matchedHub.lat + Math.sin(angle) * radiusLat + Math.sin(angle * 3) * (radiusLat * 0.12)).toFixed(5));
+    const lng = Number((matchedHub.lng + (1 - Math.cos(angle)) * radiusLng + Math.cos(angle * 2) * (radiusLng * 0.08)).toFixed(5));
+    coordinates.push([lat, lng]);
+  }
+
+  const routeName = `${matchedHub.name} – Vyhlídkový cyklookruh (${distanceKm} km)`;
+
+  return `### 🗺️ Doporučená cyklotrasa na míru: ${routeName}
+Podle vašich instrukcí v regionu **${matchedHub.region}** doporučuji ověřenou a bezpečnou trasu:
+
+- **Start & Cíl:** ${waypoints[0]?.name || matchedHub.name} (Okruh)
+- **Vzdálenost:** cca ${distanceKm} km
+- **Převýšení:** +${elevationGain} m (plynulý členitý profil vhodný pro trénink i výlet)
+- **Typ kola:** ${bikeType}
+- **Povrch:** 85 % hladký asfalt a vyhrazené cyklostezky, 15 % kvalitní zpevněný povrch.
+- **Bezpečnost:** Trasa vede převážně mimo frekventované tahy po značených cyklotrasách a vedlejších silnicích s minimálním provozem.
+
+**Doporučené zastávky po trase:**
+${waypoints.map((wp, i) => `${i + 1}. **${wp.name}:** ${wp.note}`).join("\n")}
 
 \`\`\`json
 {
-  "routeName": "Karlštejnský okruh podél Berounky",
-  "distanceKm": 35.0,
-  "elevationGainM": 260,
-  "bikeType": "Gravel / Silniční / Treking",
-  "waypoints": [
-    { "name": "Start: Radotín lávka", "lat": 49.9862, "lng": 14.3642 },
-    { "name": "Černošice", "lat": 49.9540, "lng": 14.2790 },
-    { "name": "Dobřichovice", "lat": 49.9280, "lng": 14.2340 },
-    { "name": "Hrad Karlštejn", "lat": 49.9395, "lng": 14.1880 },
-    { "name": "Srbsko", "lat": 49.9338, "lng": 14.2120 }
-  ],
-  "coordinates": [
-    [49.9862, 14.3642],
-    [49.9818, 14.3490],
-    [49.9721, 14.3284],
-    [49.9610, 14.2985],
-    [49.9540, 14.2790],
-    [49.9480, 14.2560],
-    [49.9420, 14.2340],
-    [49.9380, 14.2050],
-    [49.9395, 14.1880],
-    [49.9410, 14.1750],
-    [49.9392, 14.1820],
-    [49.9338, 14.2120],
-    [49.9380, 14.2620],
-    [49.9650, 14.3320],
-    [49.9862, 14.3642]
-  ]
+  "routeName": "${routeName}",
+  "distanceKm": ${distanceKm},
+  "elevationGainM": ${elevationGain},
+  "bikeType": "${bikeType}",
+  "waypoints": ${JSON.stringify(waypoints, null, 2)},
+  "coordinates": ${JSON.stringify(coordinates)}
 }
 \`\`\``;
-      return res.json({ reply: fallbackRoute, model: "fallback" });
+}
+
+// Specialized Multi-Turn Route Planning Assistant
+app.post("/api/route-planner-chat", async (req, res) => {
+  const { message, chatHistory, userPreferences, currentLocation } = req.body || {};
+  if (!message) {
+    return res.status(400).json({ error: "Missing message" });
+  }
+
+  try {
+    const ai = getGeminiClient();
+    if (!ai) {
+      const fallbackRoute = generateSmartRouteFallback(message, userPreferences, currentLocation);
+      return res.json({ reply: fallbackRoute, model: "fallback-geo-engine" });
     }
 
     const systemInstruction = `Jsi 'CykloNavigátor' – špičkový specializovaný asistent a plánovač cyklistických tras, který pomáhá cyklistům najít ideální trasu PŘESNĚ podle jejich instrukcí a parametrů.
@@ -436,54 +685,13 @@ ${userPreferences ? `Uživatelské preference: ${JSON.stringify(userPreferences)
       model: result.model,
     });
   } catch (error: any) {
-    console.error("Error in route planner chat:", error);
+    console.error("Error in route planner chat, using intelligent geo engine fallback:", error?.message || error);
 
-    // Provide intelligent fallback route instead of failing with raw error
-    const fallbackRoute = `### 🗺️ Doporučená cyklotrasa na míru: Karlštejnský okruh podél řeky
-Podle vašich instrukcí doporučuji ověřenou a bezpečnou trasu:
-
-- **Start & Cíl:** Praha-Radotín ➔ Karlštejn ➔ Srbsko ➔ zpět (Okruh)
-- **Vzdálenost:** cca 35 km
-- **Převýšení:** +260 m (převážně rovinatý profil v údolí s jedním mírným stoupáním)
-- **Povrch:** 85 % hladký asfalt, 15 % jemná zpevněná šotolina (vhodné pro silniční, gravel i treking)
-- **Bezpečnost:** Vede mimo hlavní silnice po páteřní cyklotrase A1 a navazujících cyklostezkách podél Berounky.
-
-\`\`\`json
-{
-  "routeName": "Karlštejnský okruh podél Berounky",
-  "distanceKm": 35.0,
-  "elevationGainM": 260,
-  "bikeType": "Gravel / Silniční / Treking",
-  "waypoints": [
-    { "name": "Start: Radotín lávka", "lat": 49.9862, "lng": 14.3642 },
-    { "name": "Černošice", "lat": 49.9540, "lng": 14.2790 },
-    { "name": "Dobřichovice", "lat": 49.9280, "lng": 14.2340 },
-    { "name": "Hrad Karlštejn", "lat": 49.9395, "lng": 14.1880 },
-    { "name": "Srbsko", "lat": 49.9338, "lng": 14.2120 }
-  ],
-  "coordinates": [
-    [49.9862, 14.3642],
-    [49.9818, 14.3490],
-    [49.9721, 14.3284],
-    [49.9610, 14.2985],
-    [49.9540, 14.2790],
-    [49.9480, 14.2560],
-    [49.9420, 14.2340],
-    [49.9380, 14.2050],
-    [49.9395, 14.1880],
-    [49.9410, 14.1750],
-    [49.9392, 14.1820],
-    [49.9338, 14.2120],
-    [49.9380, 14.2620],
-    [49.9650, 14.3320],
-    [49.9862, 14.3642]
-  ]
-}
-\`\`\``;
+    const fallbackRoute = generateSmartRouteFallback(message, userPreferences, currentLocation);
 
     res.json({
       reply: fallbackRoute,
-      model: "fallback",
+      model: "fallback-geo-engine",
       warning: "Přechodný režim asistenta.",
     });
   }

@@ -1,11 +1,31 @@
 import React, { useEffect, useRef, useState } from 'react';
 import L from 'leaflet';
-import { GpsPoint, MapTileProvider } from '../types';
-import { Layers, Locate, Maximize2, Navigation, Compass } from 'lucide-react';
+import { GpsPoint, MapTileProvider, PlannedRoute } from '../types';
+import { exportPlannedRouteToGpx, downloadFile, getCoordinateAtDistance, reversePlannedRoute } from '../utils/geoUtils';
+import { RouteElevationProfile } from './RouteElevationProfile';
+import {
+  Layers,
+  Locate,
+  Maximize2,
+  Navigation,
+  Compass,
+  MapPin,
+  Sparkles,
+  X,
+  Mountain,
+  Repeat,
+  Download,
+  ChevronDown,
+  ChevronUp
+} from 'lucide-react';
 
 interface CyclingMapProps {
   points: GpsPoint[];
   currentLocation?: GpsPoint | null;
+  plannedRoute?: PlannedRoute | null;
+  onClearPlannedRoute?: () => void;
+  onReversePlannedRoute?: (route: PlannedRoute) => void;
+  hoveredRouteDistanceKm?: number | null;
   isRecording?: boolean;
   followCyclist?: boolean;
   onToggleFollow?: () => void;
@@ -20,56 +40,65 @@ const TILE_PROVIDERS: Record<MapTileProvider, { name: string; url: string; attri
     subtitle: 'Cyklotrasy, stezky, povrchy a převýšení',
     url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Cyklo data &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
-    maxZoom: 19
+    maxZoom: 19,
   },
   osm: {
     name: 'OpenStreetMap Standard',
     subtitle: 'Klasická veřejná celosvětová mapa',
     url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-    maxZoom: 19
+    maxZoom: 19,
   },
   topo: {
     name: 'OpenTopoMap (Vrstevnice)',
     subtitle: 'Topografická mapa s vrstevnicemi a terénem',
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: 'Map data: &copy; OSM contributors, SRTM | Map style: &copy; OpenTopoMap',
-    maxZoom: 17
+    maxZoom: 17,
   },
   voyager: {
     name: 'Carto Voyager (Svěží silniční)',
     subtitle: 'Čistý moderní kartografický styl',
     url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
-    maxZoom: 19
-  }
+    maxZoom: 19,
+  },
 };
 
 export const CyclingMap: React.FC<CyclingMapProps> = ({
   points,
   currentLocation,
+  plannedRoute,
+  onClearPlannedRoute,
+  onReversePlannedRoute,
+  hoveredRouteDistanceKm,
   isRecording = false,
   followCyclist = true,
   onToggleFollow,
   className = 'h-full w-full',
   tileProvider = 'cyclosm',
-  onTileProviderChange
+  onTileProviderChange,
 }) => {
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
+  const plannedPolylineRef = useRef<L.Polyline | null>(null);
+  const plannedMarkersLayerRef = useRef<L.LayerGroup | null>(null);
   const currentMarkerRef = useRef<L.Marker | null>(null);
   const startMarkerRef = useRef<L.Marker | null>(null);
+  const hoverPointMarkerRef = useRef<L.Marker | null>(null);
+
   const [showLayerMenu, setShowLayerMenu] = useState(false);
+  const [showElevationDrawer, setShowElevationDrawer] = useState(false);
+  const [internalHoverDistance, setInternalHoverDistance] = useState<number | null>(null);
 
   // Initialize Map
   useEffect(() => {
     if (!mapContainerRef.current || mapInstanceRef.current) return;
 
-    // Default center in Czech Republic (or default position)
-    const initialLat = currentLocation ? currentLocation.lat : (points[0]?.lat || 49.9862);
-    const initialLng = currentLocation ? currentLocation.lng : (points[0]?.lng || 14.3642);
+    const initialLat = currentLocation ? currentLocation.lat : points[0]?.lat || 49.9862;
+    const initialLng = currentLocation ? currentLocation.lng : points[0]?.lng || 14.3642;
 
     const map = L.map(mapContainerRef.current, {
       center: [initialLat, initialLng],
@@ -77,17 +106,16 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
       zoomControl: false,
     });
 
-    // Add Tile Layer
     const providerConfig = TILE_PROVIDERS[tileProvider];
     const tileLayer = L.tileLayer(providerConfig.url, {
       attribution: providerConfig.attribution,
       maxZoom: providerConfig.maxZoom,
-      subdomains: 'abc'
+      subdomains: 'abc',
     }).addTo(map);
 
     tileLayerRef.current = tileLayer;
 
-    // Route Polyline
+    // Route Polyline (Recorded / Live track)
     const polyline = L.polyline([], {
       color: '#10b981', // Emerald primary
       weight: 5,
@@ -97,9 +125,23 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
     }).addTo(map);
     polylineRef.current = polyline;
 
+    // Planned Polyline (AI Planner route)
+    const plannedPolyline = L.polyline([], {
+      color: '#06b6d4', // Cyan
+      weight: 5,
+      dashArray: '8, 8',
+      opacity: 0.95,
+      lineCap: 'round',
+      lineJoin: 'round',
+    }).addTo(map);
+    plannedPolylineRef.current = plannedPolyline;
+
+    // Planned Markers Group
+    const plannedMarkersLayer = L.layerGroup().addTo(map);
+    plannedMarkersLayerRef.current = plannedMarkersLayer;
+
     mapInstanceRef.current = map;
 
-    // Invalidate size after layout settles
     const timer = setTimeout(() => {
       map.invalidateSize();
     }, 200);
@@ -120,7 +162,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
     const newTileLayer = L.tileLayer(providerConfig.url, {
       attribution: providerConfig.attribution,
       maxZoom: providerConfig.maxZoom,
-      subdomains: 'abc'
+      subdomains: 'abc',
     }).addTo(mapInstanceRef.current);
 
     tileLayerRef.current = newTileLayer;
@@ -133,7 +175,6 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
     const latLngs: [number, number][] = points.map((p) => [p.lat, p.lng]);
     polylineRef.current.setLatLngs(latLngs);
 
-    // Start marker
     if (points.length > 0 && !startMarkerRef.current) {
       const startIcon = L.divIcon({
         className: 'custom-start-marker',
@@ -147,12 +188,81 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
       startMarkerRef.current = null;
     }
 
-    // Auto-fit if we just loaded historical track and not recording
-    if (!isRecording && points.length > 1) {
+    if (!isRecording && points.length > 1 && !plannedRoute) {
       const bounds = L.latLngBounds(latLngs);
       mapInstanceRef.current.fitBounds(bounds, { padding: [40, 40] });
     }
-  }, [points, isRecording]);
+  }, [points, isRecording, plannedRoute]);
+
+  // Update Planned Route Polyline and Waypoint Markers
+  useEffect(() => {
+    if (!mapInstanceRef.current || !plannedPolylineRef.current || !plannedMarkersLayerRef.current) return;
+
+    plannedMarkersLayerRef.current.clearLayers();
+
+    if (!plannedRoute || !plannedRoute.coordinates || plannedRoute.coordinates.length === 0) {
+      plannedPolylineRef.current.setLatLngs([]);
+      return;
+    }
+
+    const validCoords: [number, number][] = (plannedRoute.coordinates || []).filter(
+      (c): c is [number, number] =>
+        Array.isArray(c) &&
+        c.length >= 2 &&
+        typeof c[0] === 'number' &&
+        typeof c[1] === 'number' &&
+        !isNaN(c[0]) &&
+        !isNaN(c[1]) &&
+        isFinite(c[0]) &&
+        isFinite(c[1])
+    );
+
+    if (validCoords.length === 0) {
+      plannedPolylineRef.current.setLatLngs([]);
+      return;
+    }
+
+    plannedPolylineRef.current.setLatLngs(validCoords);
+
+    // Add Waypoint markers
+    if (plannedRoute.waypoints && plannedRoute.waypoints.length > 0) {
+      plannedRoute.waypoints.forEach((wp, idx) => {
+        if (typeof wp.lat !== 'number' || typeof wp.lng !== 'number' || isNaN(wp.lat) || isNaN(wp.lng)) {
+          return;
+        }
+        const isStart = idx === 0;
+        const isEnd = idx === plannedRoute.waypoints!.length - 1;
+        const label = isStart ? 'S' : isEnd ? 'C' : `${idx + 1}`;
+        const colorClass = isStart ? 'bg-emerald-500' : isEnd ? 'bg-rose-500' : 'bg-cyan-600';
+
+        const wpIcon = L.divIcon({
+          className: 'custom-wp-marker',
+          html: `<div class="w-7 h-7 ${colorClass} border-2 border-white rounded-full flex items-center justify-center text-white text-xs font-bold shadow-xl cursor-pointer" title="${wp.name}">${label}</div>`,
+          iconSize: [28, 28],
+          iconAnchor: [14, 14],
+        });
+
+        const marker = L.marker([wp.lat, wp.lng], { icon: wpIcon });
+        marker.bindPopup(`
+          <div style="color: #1c1917; font-family: sans-serif; font-size: 13px;">
+            <strong>${wp.name}</strong>
+            ${wp.elevationM ? `<br/><span style="font-size: 11px; color: #0284c7;">${wp.elevationM} m n.m.</span>` : ''}
+            ${wp.note ? `<br/><span style="font-size: 11px; color: #57534e;">${wp.note}</span>` : ''}
+          </div>
+        `);
+        plannedMarkersLayerRef.current!.addLayer(marker);
+      });
+    }
+
+    try {
+      const bounds = L.latLngBounds(validCoords);
+      if (bounds.isValid()) {
+        mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+      }
+    } catch (e) {
+      console.warn('Map fitBounds failed:', e);
+    }
+  }, [plannedRoute]);
 
   // Update Current Cyclist Location Marker
   useEffect(() => {
@@ -183,17 +293,62 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
       currentMarkerRef.current.setLatLng(latLng);
     }
 
-    // Follow cyclist if enabled
     if (followCyclist && mapInstanceRef.current) {
       mapInstanceRef.current.panTo(latLng, { animate: true, duration: 0.8 });
     }
   }, [currentLocation, points, followCyclist]);
+
+  // Hover point marker along planned route (Elevation scrub synch)
+  const activeHoverDist = hoveredRouteDistanceKm !== undefined ? hoveredRouteDistanceKm : internalHoverDistance;
+  useEffect(() => {
+    if (!mapInstanceRef.current || !plannedRoute) {
+      if (hoverPointMarkerRef.current) {
+        mapInstanceRef.current?.removeLayer(hoverPointMarkerRef.current);
+        hoverPointMarkerRef.current = null;
+      }
+      return;
+    }
+
+    if (activeHoverDist === null || activeHoverDist === undefined) {
+      if (hoverPointMarkerRef.current) {
+        mapInstanceRef.current.removeLayer(hoverPointMarkerRef.current);
+        hoverPointMarkerRef.current = null;
+      }
+      return;
+    }
+
+    const coord = getCoordinateAtDistance(plannedRoute, activeHoverDist);
+    if (!coord) return;
+
+    if (!hoverPointMarkerRef.current) {
+      const icon = L.divIcon({
+        className: 'hover-profile-marker',
+        html: `
+          <div class="relative flex items-center justify-center">
+            <div class="w-5 h-5 bg-cyan-400 border-2 border-stone-950 rounded-full shadow-2xl animate-pulse"></div>
+          </div>
+        `,
+        iconSize: [20, 20],
+        iconAnchor: [10, 10],
+      });
+      hoverPointMarkerRef.current = L.marker(coord, { icon, zIndexOffset: 1500 }).addTo(mapInstanceRef.current);
+    } else {
+      hoverPointMarkerRef.current.setLatLng(coord);
+    }
+  }, [plannedRoute, activeHoverDist]);
 
   const handleFitRoute = () => {
     if (!mapInstanceRef.current || points.length === 0) return;
     const latLngs: [number, number][] = points.map((p) => [p.lat, p.lng]);
     const bounds = L.latLngBounds(latLngs);
     mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+  };
+
+  const handleFitPlanned = () => {
+    if (mapInstanceRef.current && plannedRoute && plannedRoute.coordinates.length > 0) {
+      const bounds = L.latLngBounds(plannedRoute.coordinates);
+      mapInstanceRef.current.fitBounds(bounds, { padding: [50, 50] });
+    }
   };
 
   const handleRecenter = () => {
@@ -207,10 +362,90 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
     }
   };
 
+  const handleReverse = () => {
+    if (!plannedRoute) return;
+    const reversed = reversePlannedRoute(plannedRoute);
+    if (onReversePlannedRoute) {
+      onReversePlannedRoute(reversed);
+    }
+  };
+
+  const handleDownloadGpx = () => {
+    if (!plannedRoute) return;
+    const gpx = exportPlannedRouteToGpx(plannedRoute);
+    const filename = `${plannedRoute.routeName.replace(/[^a-z0-9]/gi, '_')}.gpx`;
+    downloadFile(gpx, filename, 'application/gpx+xml');
+  };
+
   return (
     <div className={`relative overflow-hidden ${className}`}>
       {/* Leaflet Map DOM Element */}
       <div id="cycling-leaflet-map" ref={mapContainerRef} className="w-full h-full z-0 bg-stone-900" />
+
+      {/* Planned Route Banner Top Left (if active) */}
+      {plannedRoute && (
+        <div className="absolute top-4 left-4 z-[400] max-w-sm bg-stone-900/95 border border-cyan-500/60 rounded-2xl p-3 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95">
+          <div className="flex items-center justify-between gap-2 mb-1">
+            <div className="flex items-center gap-1.5 text-cyan-400 font-bold text-xs">
+              <Sparkles className="w-3.5 h-3.5" />
+              <span>Aktivní cyklotrasa</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={() => setShowElevationDrawer(!showElevationDrawer)}
+                title={showElevationDrawer ? 'Skrýt výškový profil' : 'Zobrazit výškový profil'}
+                className={`p-1 rounded-lg text-xs font-semibold flex items-center gap-1 transition-all cursor-pointer ${
+                  showElevationDrawer ? 'bg-cyan-500/30 text-cyan-300' : 'hover:bg-stone-800 text-stone-300'
+                }`}
+              >
+                <Mountain className="w-3.5 h-3.5" />
+                <span className="text-[10px]">Profil</span>
+              </button>
+
+              {onClearPlannedRoute && (
+                <button
+                  type="button"
+                  onClick={onClearPlannedRoute}
+                  className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white transition-colors cursor-pointer"
+                  title="Skrýt trasu"
+                >
+                  <X className="w-3.5 h-3.5" />
+                </button>
+              )}
+            </div>
+          </div>
+
+          <div className="text-sm font-semibold text-white truncate">{plannedRoute.routeName}</div>
+
+          <div className="flex items-center justify-between text-xs text-stone-300 mt-1 font-mono">
+            <div className="flex items-center gap-2.5">
+              <span className="text-cyan-400 font-bold">{plannedRoute.distanceKm} km</span>
+              <span className="text-emerald-400 font-bold">+{plannedRoute.elevationGainM} m</span>
+              {plannedRoute.bikeType && <span className="text-stone-400 font-sans text-[11px]">{plannedRoute.bikeType}</span>}
+            </div>
+
+            <div className="flex items-center gap-1">
+              <button
+                type="button"
+                onClick={handleReverse}
+                title="Obrátit směr trasy"
+                className="p-1 rounded hover:bg-stone-800 text-stone-400 hover:text-cyan-400 cursor-pointer"
+              >
+                <Repeat className="w-3.5 h-3.5" />
+              </button>
+              <button
+                type="button"
+                onClick={handleDownloadGpx}
+                title="Stáhnout GPX"
+                className="p-1 rounded hover:bg-stone-800 text-stone-400 hover:text-cyan-400 cursor-pointer"
+              >
+                <Download className="w-3.5 h-3.5" />
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Map Control Buttons Top Right */}
       <div className="absolute top-4 right-4 z-[400] flex flex-col gap-2">
@@ -260,16 +495,29 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
           )}
         </div>
 
-        {/* Fit route button */}
+        {/* Fit recorded route button */}
         {points.length > 1 && (
           <button
             id="btn-fit-route"
             type="button"
             onClick={handleFitRoute}
-            title="Zobrazit celou trasu"
+            title="Zobrazit celou projetou trasu"
             className="p-2.5 rounded-xl bg-stone-900/90 hover:bg-stone-800 text-stone-100 border border-stone-700 shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer"
           >
             <Maximize2 className="w-5 h-5 text-stone-300" />
+          </button>
+        )}
+
+        {/* Fit planned route button */}
+        {plannedRoute && plannedRoute.coordinates.length > 0 && (
+          <button
+            id="btn-fit-planned-route"
+            type="button"
+            onClick={handleFitPlanned}
+            title="Zobrazit celou naplánovanou trasu"
+            className="p-2.5 rounded-xl bg-cyan-950/90 hover:bg-cyan-900 text-cyan-200 border border-cyan-700 shadow-xl backdrop-blur-md transition-all flex items-center justify-center cursor-pointer"
+          >
+            <Sparkles className="w-5 h-5 text-cyan-400" />
           </button>
         )}
 
@@ -289,8 +537,32 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
         </button>
       </div>
 
+      {/* Bottom Floating Elevation Profile Drawer */}
+      {plannedRoute && showElevationDrawer && (
+        <div className="absolute bottom-4 left-4 right-4 sm:left-6 sm:right-6 z-[400] max-w-xl mx-auto bg-stone-950/95 border border-stone-800 rounded-2xl shadow-2xl p-3 backdrop-blur-md animate-in slide-in-from-bottom-2 duration-200">
+          <div className="flex items-center justify-between mb-2">
+            <span className="text-xs font-bold text-cyan-400 flex items-center gap-1.5">
+              <Mountain className="w-3.5 h-3.5" />
+              Výškový profil – {plannedRoute.routeName}
+            </span>
+            <button
+              type="button"
+              onClick={() => setShowElevationDrawer(false)}
+              className="p-1 rounded-lg hover:bg-stone-800 text-stone-400 hover:text-white cursor-pointer"
+            >
+              <ChevronDown className="w-4 h-4" />
+            </button>
+          </div>
+          <RouteElevationProfile
+            route={plannedRoute}
+            compact={true}
+            onHoverDistance={(d) => setInternalHoverDistance(d)}
+          />
+        </div>
+      )}
+
       {/* Bottom Map Badge showing active public map */}
-      <div className="absolute bottom-3 left-3 z-[400] pointer-events-none">
+      <div className="absolute bottom-3 left-3 z-[300] pointer-events-none">
         <div className="px-2.5 py-1 rounded-lg bg-stone-900/80 border border-stone-800 backdrop-blur-sm text-[11px] text-stone-400 flex items-center gap-1.5 shadow-md">
           <Compass className="w-3.5 h-3.5 text-emerald-400" />
           <span>{TILE_PROVIDERS[tileProvider].name.split(' (')[0]}</span>

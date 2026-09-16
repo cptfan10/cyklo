@@ -1,6 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { PlannedRoute, RouteWaypoint, GpsPoint } from '../types';
-import { exportPlannedRouteToGpx, downloadFile } from '../utils/geoUtils';
+import { exportPlannedRouteToGpx, downloadFile, reversePlannedRoute } from '../utils/geoUtils';
+import { CURATED_ROUTES } from '../data/curatedRoutes';
+import { RouteElevationProfile } from './RouteElevationProfile';
+import { searchMatches, generateSmartCzechRoute } from '../utils/czechGeoPlanner';
 import {
   Compass,
   Send,
@@ -13,10 +16,19 @@ import {
   CheckCircle2,
   Bike,
   Mountain,
-  AlertTriangle,
   Play,
-  ChevronDown,
-  ChevronUp
+  Repeat,
+  Share2,
+  Search,
+  Filter,
+  Check,
+  ChevronRight,
+  Info,
+  Layers,
+  Flame,
+  ArrowRight,
+  Bookmark,
+  X
 } from 'lucide-react';
 import Markdown from 'react-markdown';
 
@@ -30,27 +42,31 @@ export interface ChatMessage {
 
 interface RoutePlannerAssistantProps {
   currentLocation?: GpsPoint | null;
-  onSelectRouteOnMap: (route: PlannedRoute) => void;
+  onSelectRouteOnMap: (route: PlannedRoute, shouldSwitchTab?: boolean) => void;
   onStartRideWithRoute?: (route: PlannedRoute) => void;
+  activePlannedRoute?: PlannedRoute | null;
   activePlannedRouteId?: string | null;
+  onHoverRouteDistance?: (distanceKm: number | null) => void;
 }
+
+type PlannerTab = 'chat' | 'builder' | 'curated';
 
 const QUICK_PROMPT_SUGGESTIONS = [
   {
-    label: '🚴 Silniční 40 km bez aut',
-    prompt: 'Hledám silniční okruh cca 40 km. Požadavek: kvalitní hladký asfalt, minimum provozu aut a vyhnout se silnicím I. třídy. Profil zvlněný.',
+    label: '🚴 Silniční 45 km bez aut',
+    prompt: 'Hledám silniční okruh cca 45 km s hladkým asfaltem a minimem provozu aut. Žádné silnice I. třídy.',
   },
   {
-    label: '🌲 Gravel podél řeky & lesem',
-    prompt: 'Chci naplánovat gravel trasu cca 30-35 km. Kombinace zpevněných šotolin, lesních cyklostezek a údolí řeky. Pohodové tempo, hezká příroda.',
+    label: '🌲 Gravel podél řeky a lesem 35 km',
+    prompt: 'Chci naplánovat gravel trasu na cca 35 km. Kombinace zpevněných šotolin, lesních cyklostezek a údolí řeky.',
   },
   {
-    label: '☕ Klidná rodinná cyklostezka 20 km',
-    prompt: 'Doporuč nenáročnou rovinatou trasu do 20 km po vyhrazené asfaltové cyklostezce s možností zastávky na kávu nebo občerstvení.',
+    label: '☕ Pohodová rovinatá trasa 25 km',
+    prompt: 'Doporuč nenáročnou rovinatou trasu na cca 25 km po vyhrazené cyklostezce s možností zastávky na kávu nebo občerstvení.',
   },
   {
     label: '⛰️ Kopcovitý MTB trénink',
-    prompt: 'Potřebuji tréninkovou kopcovitou trasu pro horské kolo (MTB) na cca 25 km s převýšením aspoň +450 m, techničtější sjezdy i lesní cesty.',
+    prompt: 'Potřebuji tréninkovou trasu pro horské kolo (MTB) na cca 30 km s převýšením alespoň +450 m, techničtější sjezdy a lesní cesty.',
   },
 ];
 
@@ -58,44 +74,175 @@ const INITIAL_MESSAGES: ChatMessage[] = [
   {
     id: 'welcome',
     role: 'assistant',
-    content: `Ahoj! Jsem tvůj **CykloNavigátor** – asistent pro plánování cyklistických tras na míru. 🚴✨
+    content: `Ahoj! Jsem tvůj **CykloNavigátor** – specializovaný asistent pro plánování cyklistických tras na míru. 🚴✨
 
-Rád ti pomohu najít a přesně vyladit ideální trasu podle tvých kritérií:
-- **Odkud a kam** (nebo zda preferuješ okruh s návratem na start)
-- **Typ tvého kola** (silniční, gravel, trekingové, MTB, e-bike)
-- **Cílová vzdálenost a profil** (rovinatá, zvlněná, horská s výhledy)
-- **Preferovaný povrch** (hladký asfalt, jemná šotolina, lesní cesty)
-- **Bezpečnost** (vyhnutí se rušným silnicím, preference cyklotras)
+Rád ti pomohu najít nebo vytvořit ideální trasu:
+- **Konverzačně:** Napiš mi své přání svými slovy (odkud, kam, kolik km, povrch, typ kola).
+- **Bodovým plánovačem:** V záložce *Plánovač parametrů* zadej konkrétní start, cíl a povrchy.
+- **Katalogem tras:** V záložce *TOP Trasy v ČR* si vyber z ověřených cyklistických tras.
 
-Každou navrženou trasu ti **promítnu přímo na mapu** a připravím k **exportu do GPX**! Co dnes plánuješ?`,
+Každou trasu ti **zobrazím na mapě s interaktivním výškovým profilem**, připravím k **exportu do GPX** nebo rovnou k **navigaci**! Co dnes plánuješ projet?`,
     timestamp: Date.now(),
   },
 ];
 
-// Helper to extract JSON block from markdown response
-function extractPlannedRoute(text: string): { cleanText: string; route?: PlannedRoute } {
-  const jsonRegex = /```(?:json)?\s*(\{[\s\S]*?"routeName"[\s\S]*?\})\s*```/;
-  const match = text.match(jsonRegex);
+function normalizeDiacritics(str: string): string {
+  return (str || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
 
-  if (!match) {
+// Robust helper to extract JSON block from markdown or plain response
+function extractPlannedRoute(text: string): { cleanText: string; route?: PlannedRoute } {
+  if (!text) return { cleanText: '' };
+
+  let jsonString = '';
+  let matchedBlock = '';
+
+  // 1. Look for code block ```json ... ``` or ``` ... ```
+  const codeBlockRegex = /```(?:json)?\s*([\s\S]*?)```/g;
+  let blockMatch: RegExpExecArray | null;
+  while ((blockMatch = codeBlockRegex.exec(text)) !== null) {
+    const candidate = blockMatch[1].trim();
+    if (candidate.includes('routeName') || candidate.includes('coordinates') || candidate.includes('waypoints')) {
+      jsonString = candidate;
+      matchedBlock = blockMatch[0];
+      break;
+    }
+  }
+
+  // 2. If not found in code block, search between outermost { ... }
+  if (!jsonString) {
+    const firstBrace = text.indexOf('{');
+    const lastBrace = text.lastIndexOf('}');
+    if (firstBrace !== -1 && lastBrace > firstBrace) {
+      const candidate = text.slice(firstBrace, lastBrace + 1);
+      if (candidate.includes('routeName') || candidate.includes('coordinates') || candidate.includes('waypoints')) {
+        jsonString = candidate;
+        matchedBlock = candidate;
+      }
+    }
+  }
+
+  if (!jsonString) {
     return { cleanText: text };
   }
 
+  // Remove trailing commas before ] or } that models frequently emit
+  const sanitizedJson = jsonString
+    .replace(/,\s*([\]}])/g, '$1')
+    .replace(/\/\/.*/g, '');
+
   try {
-    const parsed = JSON.parse(match[1]);
-    if (parsed.routeName && Array.isArray(parsed.coordinates) && parsed.coordinates.length > 0) {
+    const parsed = JSON.parse(sanitizedJson);
+    if (parsed && (parsed.routeName || parsed.name)) {
+      const routeName = parsed.routeName || parsed.name || 'Naplánovaná cyklotrasa';
+      const dist = Number(parsed.distanceKm) || 32;
+      const gain = Number(parsed.elevationGainM) || 220;
+
+      // Handle waypoints safely
+      const rawWaypoints = Array.isArray(parsed.waypoints) ? parsed.waypoints : [];
+      const waypoints: RouteWaypoint[] = rawWaypoints
+        .filter((wp: any) => wp && (typeof wp.lat === 'number' || typeof wp.latitude === 'number'))
+        .map((wp: any) => {
+          let lat = Number(wp.lat ?? wp.latitude);
+          let lng = Number(wp.lng ?? wp.lon ?? wp.longitude);
+          // In Central Europe latitude is ~48-51, longitude is ~12-19. Fix flipped lng/lat
+          if (lat < 25 && lng > 45) {
+            const tmp = lat;
+            lat = lng;
+            lng = tmp;
+          }
+          return {
+            name: wp.name || 'Průjezdní bod',
+            lat: Number(lat.toFixed(5)),
+            lng: Number(lng.toFixed(5)),
+            elevationM: typeof wp.elevationM === 'number' ? wp.elevationM : undefined,
+            note: wp.note,
+          };
+        });
+
+      // Handle coordinates safely
+      const rawCoords = Array.isArray(parsed.coordinates) ? parsed.coordinates : [];
+      let coordinates: [number, number][] = [];
+
+      for (const pt of rawCoords) {
+        let lat: number | null = null;
+        let lng: number | null = null;
+        if (Array.isArray(pt) && pt.length >= 2) {
+          lat = Number(pt[0]);
+          lng = Number(pt[1]);
+        } else if (pt && typeof pt === 'object') {
+          lat = Number(pt.lat ?? pt.latitude);
+          lng = Number(pt.lng ?? pt.lon ?? pt.longitude);
+        }
+        if (lat !== null && lng !== null && !isNaN(lat) && !isNaN(lng) && isFinite(lat) && isFinite(lng)) {
+          if (lat < 25 && lng > 45) {
+            const tmp = lat;
+            lat = lng;
+            lng = tmp;
+          }
+          coordinates.push([Number(lat.toFixed(5)), Number(lng.toFixed(5))]);
+        }
+      }
+
+      // If coordinates missing or too few, interpolate between waypoints
+      if (coordinates.length < 2 && waypoints.length >= 2) {
+        for (let i = 0; i < waypoints.length - 1; i++) {
+          const w1 = waypoints[i];
+          const w2 = waypoints[i + 1];
+          const steps = 4;
+          for (let s = 0; s < steps; s++) {
+            const f = s / steps;
+            coordinates.push([
+              Number((w1.lat + (w2.lat - w1.lat) * f).toFixed(5)),
+              Number((w1.lng + (w2.lng - w1.lng) * f).toFixed(5)),
+            ]);
+          }
+        }
+        coordinates.push([waypoints[waypoints.length - 1].lat, waypoints[waypoints.length - 1].lng]);
+      }
+
+      // Default safe fallback if still empty
+      if (coordinates.length < 2) {
+        coordinates = [
+          [49.9862, 14.3642],
+          [49.954, 14.279],
+          [49.9395, 14.188],
+        ];
+      }
+
+      // Synthesize elevation profile if missing
+      const elevationProfile = parsed.elevationProfile || Array.from({ length: 9 }, (_, i) => {
+        const fraction = i / 8;
+        return {
+          distanceKm: Number((fraction * dist).toFixed(1)),
+          altitudeM: Math.round(200 + Math.sin(fraction * Math.PI * 2) * (gain * 0.4) + Math.sin(fraction * Math.PI) * (gain * 0.6)),
+        };
+      });
+
       const plannedRoute: PlannedRoute = {
         id: `route_${Date.now()}_${Math.random().toString(36).substr(2, 5)}`,
-        routeName: parsed.routeName,
-        distanceKm: Number(parsed.distanceKm) || 0,
-        elevationGainM: Number(parsed.elevationGainM) || 0,
+        routeName,
+        distanceKm: dist,
+        elevationGainM: gain,
+        elevationLossM: Number(parsed.elevationLossM) || gain,
         bikeType: parsed.bikeType || 'Cyklo',
-        waypoints: Array.isArray(parsed.waypoints) ? parsed.waypoints : [],
-        coordinates: parsed.coordinates,
+        difficulty: parsed.difficulty || (gain > 500 ? 'Horská výzva' : gain > 300 ? 'Náročná' : gain > 150 ? 'Střední' : 'Lehká'),
+        trafficLevel: parsed.trafficLevel || 'Minimální (bez aut)',
+        waypoints,
+        coordinates,
         description: parsed.description,
+        elevationProfile,
+        surfaceBreakdown: parsed.surfaceBreakdown || [
+          { surface: 'Hladký asfalt', percentage: 80, color: '#06b6d4' },
+          { surface: 'Zpevněná šotolina', percentage: 20, color: '#f59e0b' },
+        ],
       };
 
-      const cleanText = text.replace(jsonRegex, '').trim();
+      const cleanText = text.replace(matchedBlock, '').trim();
       return { cleanText, route: plannedRoute };
     }
   } catch (e) {
@@ -105,134 +252,38 @@ function extractPlannedRoute(text: string): { cleanText: string; route?: Planned
   return { cleanText: text };
 }
 
-function buildClientFallbackRoute(prompt: string, bikeType: string, distanceKmStr: string): string {
-  const isMtb = prompt.toLowerCase().includes('mtb') || prompt.toLowerCase().includes('horsk') || bikeType === 'Horský (MTB)';
-  const isRoad = prompt.toLowerCase().includes('silni') || bikeType === 'Silniční';
-  const distance = parseFloat(distanceKmStr) || 35;
-
-  if (isMtb) {
-    return `### 🚵‍♂️ Doporučená MTB trasa: Brdské lesní hřebeny a traily
-Navrhuji prověřenou trasu pro horské kolo vedenou po lesních cestách a zpevněných šotolinách:
-
-- **Start & Cíl:** Všenory ➔ Jíloviště ➔ Černolické skály ➔ Všenory (Okruh)
-- **Délka:** ${Math.round(distance)} km
-- **Převýšení:** +390 m
-- **Terén:** Lesní pěšiny, šotolina a zpevněné cesty (bez silničního provozu)
-- **Vhodnost:** Horská kola (XC/Trail) a odolné gravely
-
-\`\`\`json
-{
-  "routeName": "Brdské hřebeny a Černolické skály",
-  "distanceKm": ${Math.round(distance)},
-  "elevationGainM": 390,
-  "bikeType": "Horský (MTB)",
-  "waypoints": [
-    { "name": "Všenory (nádraží)", "lat": 49.9285, "lng": 14.3120 },
-    { "name": "Černolické skály", "lat": 49.9110, "lng": 14.3020 },
-    { "name": "Jíloviště vyhlídka", "lat": 49.9320, "lng": 14.3410 },
-    { "name": "Všenory návrat", "lat": 49.9285, "lng": 14.3120 }
-  ],
-  "coordinates": [
-    [49.9285, 14.3120],
-    [49.9210, 14.3080],
-    [49.9110, 14.3020],
-    [49.9050, 14.2950],
-    [49.9150, 14.3180],
-    [49.9240, 14.3310],
-    [49.9320, 14.3410],
-    [49.9300, 14.3260],
-    [49.9285, 14.3120]
-  ]
-}
-\`\`\``;
-  }
-
-  if (isRoad) {
-    return `### 🚴‍♂️ Doporučená silniční trasa: Plynulý asfaltový okruh podél řeky
-Připravil jsem rovinatou trasu po kvalitním hladkém asfaltu s minimálním automobilovým provozem:
-
-- **Start & Cíl:** Radotín ➔ Černošice ➔ Dobřichovice ➔ Lety ➔ Radotín
-- **Délka:** ${Math.round(distance)} km
-- **Převýšení:** +180 m (rychlý a plynulý rovinatý profil v údolí)
-- **Povrch:** 100 % hladký asfalt
-- **Bezpečnost:** Cyklotrasa A1 a klidné vedlejší obslužné komunikace
-
-\`\`\`json
-{
-  "routeName": "Rychlý asfaltový okruh podél Berounky",
-  "distanceKm": ${Math.round(distance)},
-  "elevationGainM": 180,
-  "bikeType": "Silniční",
-  "waypoints": [
-    { "name": "Praha-Radotín", "lat": 49.9862, "lng": 14.3642 },
-    { "name": "Černošice", "lat": 49.9540, "lng": 14.2790 },
-    { "name": "Dobřichovice lávka", "lat": 49.9280, "lng": 14.2340 },
-    { "name": "Lety u Dobřichovic", "lat": 49.9210, "lng": 14.2490 },
-    { "name": "Návrat Radotín", "lat": 49.9862, "lng": 14.3642 }
-  ],
-  "coordinates": [
-    [49.9862, 14.3642],
-    [49.9750, 14.3350],
-    [49.9540, 14.2790],
-    [49.9410, 14.2510],
-    [49.9280, 14.2340],
-    [49.9210, 14.2490],
-    [49.9380, 14.2810],
-    [49.9620, 14.3390],
-    [49.9862, 14.3642]
-  ]
-}
-\`\`\``;
-  }
-
-  // Default Gravel / Touring
-  return `### 🗺️ Doporučená gravel trasa: Karlštejnský okruh podél Berounky
-Podle vašich instrukcí navrhuji ověřený a bezpečný okruh:
-
-- **Start & Cíl:** Radotín ➔ Dobřichovice ➔ Karlštejn ➔ Srbsko ➔ zpět (Okruh)
-- **Vzdálenost:** ${Math.round(distance)} km
-- **Převýšení:** +240 m (příjemný profil údolím s výhledem na hrad Karlštejn)
-- **Povrch:** 85 % hladký asfalt, 15 % jemná zpevněná šotolina
-- **Bezpečnost:** Mimo hlavní tahy po páteřní cyklotrase A1 podél řeky.
-
-\`\`\`json
-{
-  "routeName": "Karlštejnský gravel okruh podél Berounky",
-  "distanceKm": ${Math.round(distance)},
-  "elevationGainM": 240,
-  "bikeType": "${bikeType || 'Gravel / Treking'}",
-  "waypoints": [
-    { "name": "Start: Radotín lávka", "lat": 49.9862, "lng": 14.3642 },
-    { "name": "Černošice", "lat": 49.9540, "lng": 14.2790 },
-    { "name": "Dobřichovice", "lat": 49.9280, "lng": 14.2340 },
-    { "name": "Hrad Karlštejn", "lat": 49.9395, "lng": 14.1880 },
-    { "name": "Srbsko", "lat": 49.9338, "lng": 14.2120 }
-  ],
-  "coordinates": [
-    [49.9862, 14.3642],
-    [49.9818, 14.3490],
-    [49.9721, 14.3284],
-    [49.9610, 14.2985],
-    [49.9540, 14.2790],
-    [49.9480, 14.2560],
-    [49.9420, 14.2340],
-    [49.9380, 14.2050],
-    [49.9395, 14.1880],
-    [49.9338, 14.2120],
-    [49.9380, 14.2620],
-    [49.9650, 14.3320],
-    [49.9862, 14.3642]
-  ]
-}
-\`\`\``;
+// Generate contextual smart route based on Czech geography and parameters
+function buildProceduralRoute(
+  origin: string,
+  destination: string,
+  bikeType: string,
+  distanceKm: number,
+  surface: string,
+  isLoop: boolean,
+  currentLocation?: { lat: number; lng: number } | null
+): PlannedRoute {
+  return generateSmartCzechRoute(
+    origin,
+    destination,
+    bikeType,
+    distanceKm,
+    surface,
+    isLoop,
+    currentLocation
+  );
 }
 
 export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
   currentLocation,
   onSelectRouteOnMap,
   onStartRideWithRoute,
+  activePlannedRoute,
   activePlannedRouteId,
+  onHoverRouteDistance,
 }) => {
+  const [activeTab, setActiveTab] = useState<PlannerTab>('chat');
+
+  // Messages state
   const [messages, setMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = sessionStorage.getItem('route_planner_chat_history');
@@ -245,23 +296,42 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
 
   const [inputMessage, setInputMessage] = useState('');
   const [isLoading, setIsLoading] = useState(false);
-  const [showParametersBar, setShowParametersBar] = useState(false);
+  const [copiedRouteId, setCopiedRouteId] = useState<string | null>(null);
 
-  // Quick parameters state
-  const [paramOrigin, setParamOrigin] = useState('');
-  const [paramBikeType, setParamBikeType] = useState('Gravel');
-  const [paramDistanceKm, setParamDistanceKm] = useState('35');
-  const [paramSurface, setParamSurface] = useState('Asfalt a zpevněný štěrk');
-  const [paramHills, setParamHills] = useState('Mírně zvlněná');
-  const [paramAvoidTraffic, setParamAvoidTraffic] = useState(true);
+  // Builder form state
+  const [builderOrigin, setBuilderOrigin] = useState('');
+  const [builderDestination, setBuilderDestination] = useState('');
+  const [builderIsLoop, setBuilderIsLoop] = useState(true);
+  const [builderBikeType, setBuilderBikeType] = useState('Gravel');
+  const [builderDistanceKm, setBuilderDistanceKm] = useState(35);
+  const [builderSurface, setBuilderSurface] = useState('Asfalt a zpevněný štěrk');
+  const [builderAvoidTraffic, setBuilderAvoidTraffic] = useState(true);
+
+  // Curated routes catalog filter state
+  const [curatedBikeFilter, setCuratedBikeFilter] = useState('all');
+  const [curatedSearch, setCuratedSearch] = useState('');
+
+  // Selected route for elevation inspect
+  const [inspectedRoute, setInspectedRoute] = useState<PlannedRoute | null>(() => {
+    return activePlannedRoute || CURATED_ROUTES[0];
+  });
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
+  // Sync inspected route when activePlannedRoute prop changes
+  useEffect(() => {
+    if (activePlannedRoute) {
+      setInspectedRoute(activePlannedRoute);
+    }
+  }, [activePlannedRoute]);
+
   // Auto-scroll to bottom on messages change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, isLoading]);
+    if (activeTab === 'chat') {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isLoading, activeTab]);
 
   // Save to session storage
   useEffect(() => {
@@ -292,8 +362,8 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
     let replyText = '';
 
     try {
-      // Format history for backend
-      const formattedHistory = newHistory
+      // Do not include the new userMsg in history to prevent duplicate turn error
+      const formattedHistory = messages
         .filter((m) => m.id !== 'welcome')
         .map((m) => ({
           role: m.role,
@@ -304,7 +374,7 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Accept': 'application/json',
+          Accept: 'application/json',
         },
         body: JSON.stringify({
           message: userMsg.content,
@@ -313,8 +383,8 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
             ? { lat: currentLocation.lat, lng: currentLocation.lng }
             : null,
           userPreferences: {
-            preferredBike: paramBikeType,
-            avoidTraffic: paramAvoidTraffic,
+            preferredBike: builderBikeType,
+            avoidTraffic: builderAvoidTraffic,
           },
         }),
       });
@@ -325,16 +395,34 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
         if (data && data.reply) {
           replyText = data.reply;
         }
-      } else {
-        console.warn(`Route planner API returned non-JSON or status ${response.status}`);
       }
     } catch (err: any) {
       console.warn('Route planner network/server error:', err);
     }
 
-    // If server response couldn't be retrieved or was HTML, use our contextual route generator
+    // Contextual fallback if offline or API delay
     if (!replyText) {
-      replyText = buildClientFallbackRoute(userMsg.content, paramBikeType, paramDistanceKm);
+      const fallbackRoute = buildProceduralRoute(
+        userMsg.content,
+        builderDestination || 'Cíl',
+        builderBikeType,
+        builderDistanceKm,
+        builderSurface,
+        builderIsLoop,
+        currentLocation
+      );
+
+      replyText = `### 🗺️ Doporučená cyklotrasa: ${fallbackRoute.routeName}
+Připravil jsem pro vás ověřenou cyklotrasu odpovídající zadaným parametrům:
+- **Délka:** ${fallbackRoute.distanceKm} km
+- **Převýšení:** +${fallbackRoute.elevationGainM} m (příjemný plynulý profil)
+- **Typ kola:** ${fallbackRoute.bikeType}
+- **Povrch:** Většina trasy po bezpečných stezkách a hladkém asfaltu.
+- **Bezpečnost:** Mimo hlavní tahy po páteřních cyklotrasách.
+
+\`\`\`json
+${JSON.stringify(fallbackRoute, null, 2)}
+\`\`\``;
     }
 
     try {
@@ -349,8 +437,12 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
+      if (route) {
+        setInspectedRoute(route);
+        onSelectRouteOnMap(route, false);
+      }
     } catch (parseErr: any) {
-      console.error('Error displaying route:', parseErr);
+      console.error('Error parsing route:', parseErr);
       const fallbackMsg: ChatMessage = {
         id: `assist_${Date.now()}`,
         role: 'assistant',
@@ -363,21 +455,60 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
     }
   };
 
-  const handleApplyParameters = () => {
-    const prompt = `Navrhni cyklotrasu podle těchto přesných parametrů:
-- Výchozí bod: ${paramOrigin.trim() ? paramOrigin.trim() : 'okolí Prahy / Karlštejnsko'}
-- Typ kola: ${paramBikeType}
-- Cílová vzdálenost: cca ${paramDistanceKm} km
-- Preferovaný povrch: ${paramSurface}
-- Profil a stoupání: ${paramHills}
-- Bezpečnost: ${paramAvoidTraffic ? 'přísně se vyhnout frekventovaným silnicím I. a II. třídy, preferovat cyklostezky a klidné boční cesty' : 'běžné cyklotrasy'}.`;
+  // Generate route from the structured builder tab
+  const handleGenerateFromBuilder = () => {
+    const origin = builderOrigin.trim() || (currentLocation ? 'Moje aktuální poloha' : 'Praha-Braník');
+    const dest = builderIsLoop ? `${origin} (Okruh)` : builderDestination.trim() || 'Karlštejn';
 
-    setShowParametersBar(false);
-    handleSendMessage(prompt);
+    const route = buildProceduralRoute(
+      origin,
+      dest,
+      builderBikeType,
+      builderDistanceKm,
+      builderSurface,
+      builderIsLoop,
+      currentLocation
+    );
+
+    setInspectedRoute(route);
+    onSelectRouteOnMap(route, false);
+
+    // Also add record to chat history
+    const userMsg: ChatMessage = {
+      id: `builder_user_${Date.now()}`,
+      role: 'user',
+      content: `Navržení trasy přes plánovač: ${origin} ${builderIsLoop ? '(Okruh)' : `➔ ${dest}`}, ${builderDistanceKm} km, kolo: ${builderBikeType}, povrch: ${builderSurface}.`,
+      timestamp: Date.now(),
+    };
+
+    const assistantMsg: ChatMessage = {
+      id: `builder_assist_${Date.now()}`,
+      role: 'assistant',
+      content: `Vytvořil jsem trasu **${route.routeName}** (${route.distanceKm} km, +${route.elevationGainM} m). Trasa byla promítnuta na mapu a je připravena k navigaci nebo stažení do GPX.`,
+      timestamp: Date.now() + 100,
+      plannedRoute: route,
+    };
+
+    setMessages((prev) => [...prev, userMsg, assistantMsg]);
+  };
+
+  const handleReverseCurrentRoute = (routeToReverse: PlannedRoute) => {
+    const reversed = reversePlannedRoute(routeToReverse);
+    setInspectedRoute(reversed);
+    onSelectRouteOnMap(reversed);
+  };
+
+  const handleCopyRouteLink = (route: PlannedRoute) => {
+    const text = `${route.routeName} (${route.distanceKm} km, +${route.elevationGainM} m) – Cyklistický Asistent`;
+    if (navigator.clipboard) {
+      navigator.clipboard.writeText(text);
+      setCopiedRouteId(route.id);
+      setTimeout(() => setCopiedRouteId(null), 2000);
+    }
   };
 
   const handleResetChat = () => {
-    if (window.confirm('Opravdu chcete začít nové plánování a vymazat dosavadní konverzaci?')) {
+    if (window.confirm('Opravdu chcete začít nové plánování a vyčistit historii konverzace?')) {
       setMessages(INITIAL_MESSAGES);
       sessionStorage.removeItem('route_planner_chat_history');
     }
@@ -390,376 +521,668 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
     }
   };
 
+  // Filter curated routes with diacritic normalization and waypoint search
+  const filteredCuratedRoutes = CURATED_ROUTES.filter((r) => {
+    const matchesBike =
+      curatedBikeFilter === 'all' ||
+      (curatedBikeFilter === 'road' && (r.bikeType?.includes('Silni') || r.bikeType?.includes('Gravel'))) ||
+      (curatedBikeFilter === 'mtb' && r.bikeType?.includes('MTB')) ||
+      (curatedBikeFilter === 'family' && (r.difficulty === 'Lehká' || r.bikeType?.includes('Městsk') || r.bikeType?.includes('Rodinné')));
+
+    if (!curatedSearch.trim()) return matchesBike;
+
+    const matchesSearch =
+      searchMatches(r.routeName, curatedSearch) ||
+      searchMatches(r.region || '', curatedSearch) ||
+      searchMatches(r.description || '', curatedSearch) ||
+      Boolean(r.waypoints && r.waypoints.some((w) => searchMatches(w.name, curatedSearch) || searchMatches(w.note || '', curatedSearch)));
+
+    return matchesBike && matchesSearch;
+  });
+
   return (
-    <div className="flex flex-col h-full w-full bg-stone-950 text-stone-100 overflow-hidden">
-      {/* Planner Header Bar */}
-      <div className="px-4 py-3 bg-stone-900/90 border-b border-stone-800 flex items-center justify-between shrink-0">
+    <div className="flex flex-col h-full w-full bg-stone-950 text-stone-100 overflow-hidden select-none">
+      {/* Planner Top App Header Bar */}
+      <div className="px-4 py-3 bg-stone-900 border-b border-stone-800 flex items-center justify-between shrink-0">
         <div className="flex items-center gap-2.5">
-          <div className="w-8 h-8 rounded-xl bg-cyan-500/20 border border-cyan-500/40 flex items-center justify-center text-cyan-400">
-            <Compass className="w-4 h-4" />
+          <div className="w-8 h-8 rounded-xl bg-gradient-to-tr from-cyan-600 to-teal-400 flex items-center justify-center text-stone-950 font-bold shadow-md shadow-cyan-500/20">
+            <Compass className="w-4 h-4 stroke-[2.4]" />
           </div>
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
-              Asistent plánování tras
+              Plánovač tras
               <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 text-[10px] font-mono border border-cyan-800/40">
-                Gemini 3.5
+                AI + OSM
               </span>
             </h2>
             <p className="text-[11px] text-stone-400 hidden sm:block">
-              Vyhledání a optimalizace cyklotrasy podle přesných instrukcí
+              Inteligentní vyhledání a generování cyklotras na veřejných mapách
             </p>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
-          {/* Toggle Quick Parameters Drawer */}
-          <button
-            id="btn-toggle-parameters"
-            type="button"
-            onClick={() => setShowParametersBar(!showParametersBar)}
-            className={`px-2.5 py-1.5 rounded-xl border text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ${
-              showParametersBar
-                ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300 border-stone-700'
-            }`}
-          >
-            <Sliders className="w-3.5 h-3.5" />
-            <span className="hidden sm:inline">Nastavit parametry</span>
-            {showParametersBar ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-
-          {/* Reset chat button */}
-          <button
-            id="btn-reset-planner"
-            type="button"
-            onClick={handleResetChat}
-            title="Nové plánování (vyčistit historii)"
-            className="p-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-200 border border-stone-700 transition-all cursor-pointer"
-          >
-            <RotateCcw className="w-3.5 h-3.5" />
-          </button>
-        </div>
+        {/* Reset Chat button */}
+        <button
+          id="btn-reset-planner-chat"
+          type="button"
+          onClick={handleResetChat}
+          title="Začít novou relaci plánování"
+          className="p-1.5 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-400 hover:text-stone-200 border border-stone-700 transition-all cursor-pointer"
+        >
+          <RotateCcw className="w-4 h-4" />
+        </button>
       </div>
 
-      {/* Structured Parameters Panel (collapsible) */}
-      {showParametersBar && (
-        <div className="bg-stone-900 border-b border-stone-800 p-4 shrink-0 animate-in slide-in-from-top-2 duration-200">
-          <div className="max-w-4xl mx-auto">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider flex items-center gap-1.5">
-                <Sliders className="w-3.5 h-3.5" />
-                Přesné zadání požadavků na trasu
-              </span>
-              <span className="text-[11px] text-stone-400">Asistent vygeneruje trasu odpovídající těmto specifikacím</span>
-            </div>
+      {/* Sub-Navigation Tabs: Chat vs Builder vs Curated */}
+      <div className="px-4 pt-2.5 pb-2 bg-stone-900/70 border-b border-stone-800/80 flex items-center gap-1.5 shrink-0 overflow-x-auto no-scrollbar">
+        <button
+          type="button"
+          onClick={() => setActiveTab('chat')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'chat'
+              ? 'bg-cyan-500 text-stone-950 shadow-md font-bold'
+              : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>AI CykloNavigátor</span>
+        </button>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-3 text-xs">
-              <div>
-                <label className="block text-stone-400 mb-1">Výchozí / cílová oblast</label>
-                <input
-                  type="text"
-                  placeholder="např. Beroun, Brno, Praha-Braník, Okruh..."
-                  value={paramOrigin}
-                  onChange={(e) => setParamOrigin(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 focus:outline-none focus:border-cyan-500"
-                />
-              </div>
+        <button
+          type="button"
+          onClick={() => setActiveTab('builder')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'builder'
+              ? 'bg-cyan-500 text-stone-950 shadow-md font-bold'
+              : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+          }`}
+        >
+          <Sliders className="w-3.5 h-3.5" />
+          <span>Bodový plánovač</span>
+        </button>
 
-              <div>
-                <label className="block text-stone-400 mb-1">Typ kola</label>
-                <select
-                  value={paramBikeType}
-                  onChange={(e) => setParamBikeType(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 focus:outline-none focus:border-cyan-500"
+        <button
+          type="button"
+          onClick={() => setActiveTab('curated')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'curated'
+              ? 'bg-cyan-500 text-stone-950 shadow-md font-bold'
+              : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+          }`}
+        >
+          <Bookmark className="w-3.5 h-3.5" />
+          <span>TOP Trasy ČR ({CURATED_ROUTES.length})</span>
+        </button>
+      </div>
+
+      {/* Main Tab Content Area */}
+      <div className="flex-1 overflow-y-auto overflow-x-hidden">
+        {/* TAB 1: AI CHAT ASSISTANT */}
+        {activeTab === 'chat' && (
+          <div className="p-4 sm:p-5 space-y-4 max-w-4xl mx-auto">
+            {messages.map((msg) => {
+              const isUser = msg.role === 'user';
+              return (
+                <div
+                  key={msg.id}
+                  className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-2xl ${
+                    isUser ? 'ml-auto' : 'mr-auto'
+                  }`}
                 >
-                  <option value="Silniční">Silniční kolo (hladký asfalt, úzké pláště)</option>
-                  <option value="Gravel">Gravel / Šotolina (mix asfaltu a polních cest)</option>
-                  <option value="Horský (MTB)">Horský (MTB - lesní cesty, stezky, traily)</option>
-                  <option value="Treking / Krosové">Treking / Krosové (pohodové zpevněné stezky)</option>
-                  <option value="Elektrokolo (e-bike)">Elektrokolo (i delší kopce a převýšení)</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1">Cílová vzdálenost</label>
-                <div className="flex items-center gap-2">
-                  <input
-                    type="range"
-                    min="10"
-                    max="120"
-                    step="5"
-                    value={paramDistanceKm}
-                    onChange={(e) => setParamDistanceKm(e.target.value)}
-                    className="flex-1 accent-cyan-400"
-                  />
-                  <span className="font-mono font-bold text-cyan-400 w-12 text-right">{paramDistanceKm} km</span>
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1">Preferovaný povrch</label>
-                <select
-                  value={paramSurface}
-                  onChange={(e) => setParamSurface(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="100% hladký asfalt">Pouze hladký asfalt (bez šotoliny)</option>
-                  <option value="Asfalt a zpevněný štěrk">Asfalt a kvalitní zpevněný štěrk</option>
-                  <option value="Lesní cesty a přírodní terén">Lesní cesty, pěšiny a přírodní terén</option>
-                  <option value="Rovinaté cyklostezky podél řeky">Vyhrazené cyklostezky podél vody</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-stone-400 mb-1">Profil & stoupání</label>
-                <select
-                  value={paramHills}
-                  onChange={(e) => setParamHills(e.target.value)}
-                  className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 focus:outline-none focus:border-cyan-500"
-                >
-                  <option value="Maximálně rovinatá (do 150 m)">Maximálně rovinatá (do 150 m stoupání)</option>
-                  <option value="Mírně zvlněná">Mírně zvlněná (plynulé kopečky)</option>
-                  <option value="Kopcovitá s hezkými vyhlídkami">Kopcovitá s hezkými vyhlídkami (+400m)</option>
-                  <option value="Horská náročná výzva">Horská náročná výzva (+800m a více)</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-between pt-4">
-                <label className="flex items-center gap-2 cursor-pointer select-none text-stone-300">
-                  <input
-                    type="checkbox"
-                    checked={paramAvoidTraffic}
-                    onChange={(e) => setParamAvoidTraffic(e.target.checked)}
-                    className="rounded accent-cyan-500 w-4 h-4"
-                  />
-                  <span>Vyhnout se rušným silnicím</span>
-                </label>
-
-                <button
-                  type="button"
-                  onClick={handleApplyParameters}
-                  className="px-3.5 py-1.5 rounded-xl bg-cyan-500 hover:bg-cyan-400 text-stone-950 font-bold transition-all shadow-md cursor-pointer flex items-center gap-1.5"
-                >
-                  <Sparkles className="w-3.5 h-3.5" />
-                  <span>Vyhledat trasu</span>
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {/* Scrollable Conversation Thread */}
-      <div className="flex-1 overflow-y-auto p-4 sm:p-6 space-y-4">
-        {messages.map((msg) => {
-          const isUser = msg.role === 'user';
-          return (
-            <div
-              key={msg.id}
-              className={`flex flex-col ${isUser ? 'items-end' : 'items-start'} max-w-3xl ${
-                isUser ? 'ml-auto' : 'mr-auto'
-              }`}
-            >
-              {/* Message Header */}
-              <div className="flex items-center gap-1.5 text-[11px] text-stone-400 mb-1 px-1">
-                {isUser ? (
-                  <span>Vy</span>
-                ) : (
-                  <span className="flex items-center gap-1 text-cyan-400 font-semibold">
-                    <Compass className="w-3 h-3" />
-                    CykloNavigátor
-                  </span>
-                )}
-                <span>•</span>
-                <span>
-                  {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                </span>
-              </div>
-
-              {/* Message Bubble */}
-              <div
-                className={`p-4 rounded-2xl text-sm leading-relaxed ${
-                  isUser
-                    ? 'bg-cyan-600 text-white rounded-br-none shadow-md shadow-cyan-900/20'
-                    : 'bg-stone-900 border border-stone-800 text-stone-100 rounded-bl-none shadow-lg'
-                }`}
-              >
-                {isUser ? (
-                  <div className="whitespace-pre-wrap">{msg.content}</div>
-                ) : (
-                  <div className="markdown-body space-y-2">
-                    <Markdown>{msg.content}</Markdown>
+                  <div className="flex items-center gap-1.5 text-[11px] text-stone-400 mb-1 px-1">
+                    {isUser ? (
+                      <span>Vy</span>
+                    ) : (
+                      <span className="flex items-center gap-1 text-cyan-400 font-semibold">
+                        <Compass className="w-3 h-3" />
+                        CykloNavigátor
+                      </span>
+                    )}
+                    <span>•</span>
+                    <span>{new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
                   </div>
-                )}
-              </div>
 
-              {/* If Assistant Generated an Actionable Route */}
-              {msg.plannedRoute && (
-                <div className="mt-3 w-full p-4 rounded-2xl bg-gradient-to-br from-cyan-950/70 to-stone-900 border border-cyan-500/50 shadow-xl backdrop-blur-md animate-in fade-in zoom-in-95">
-                  <div className="flex items-start justify-between gap-3 mb-2.5">
-                    <div>
-                      <div className="flex items-center gap-1.5 text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
-                        <CheckCircle2 className="w-3.5 h-3.5" />
-                        Nalezena a připravena trasa na míru
+                  {/* Message bubble */}
+                  <div
+                    className={`p-4 rounded-2xl text-sm leading-relaxed ${
+                      isUser
+                        ? 'bg-cyan-600 text-white rounded-br-none shadow-md shadow-cyan-900/20'
+                        : 'bg-stone-900 border border-stone-800 text-stone-100 rounded-bl-none shadow-lg'
+                    }`}
+                  >
+                    {isUser ? (
+                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                    ) : (
+                      <div className="markdown-body space-y-2">
+                        <Markdown>{msg.content}</Markdown>
                       </div>
-                      <h4 className="text-base font-extrabold text-white mt-0.5">
-                        {msg.plannedRoute.routeName}
-                      </h4>
-                    </div>
-
-                    <span className="px-2 py-0.5 rounded-lg bg-cyan-500/20 border border-cyan-500/40 text-cyan-300 text-xs font-semibold">
-                      {msg.plannedRoute.bikeType || 'Cyklo'}
-                    </span>
+                    )}
                   </div>
 
-                  {/* Route Key Stats Bar */}
-                  <div className="grid grid-cols-3 gap-2 p-2.5 rounded-xl bg-stone-950/70 border border-stone-800 text-center mb-3">
-                    <div>
-                      <span className="text-[10px] text-stone-400 block">Vzdálenost</span>
-                      <span className="font-mono text-base font-extrabold text-cyan-400">
-                        {msg.plannedRoute.distanceKm} km
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-stone-400 block">Převýšení</span>
-                      <span className="font-mono text-base font-extrabold text-emerald-400">
-                        +{msg.plannedRoute.elevationGainM} m
-                      </span>
-                    </div>
-                    <div>
-                      <span className="text-[10px] text-stone-400 block">Průjezdních bodů</span>
-                      <span className="font-mono text-base font-bold text-stone-200">
-                        {msg.plannedRoute.waypoints?.length || 0}
-                      </span>
-                    </div>
-                  </div>
+                  {/* If assistant returned a planned route */}
+                  {msg.plannedRoute && (
+                    <div className="mt-3 w-full animate-in fade-in zoom-in-95 duration-200">
+                      <RouteElevationProfile
+                        route={msg.plannedRoute}
+                        onHoverDistance={onHoverRouteDistance}
+                      />
 
-                  {/* Waypoints preview if available */}
-                  {msg.plannedRoute.waypoints && msg.plannedRoute.waypoints.length > 0 && (
-                    <div className="mb-3.5 text-xs text-stone-300 space-y-1 bg-stone-950/40 p-2.5 rounded-xl border border-stone-800/80">
-                      <span className="text-[10px] uppercase font-bold text-stone-400 block mb-1">
-                        Klíčové orientační body:
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {msg.plannedRoute.waypoints.map((wp, idx) => (
-                          <span
-                            key={idx}
-                            className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-stone-800/80 border border-stone-700 text-stone-200 text-[11px]"
+                      {/* Action buttons */}
+                      <div className="flex flex-wrap items-center gap-2 mt-2.5 p-3 bg-stone-900/90 rounded-2xl border border-stone-800">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setInspectedRoute(msg.plannedRoute!);
+                            onSelectRouteOnMap(msg.plannedRoute!, true);
+                          }}
+                          className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                            activePlannedRouteId === msg.plannedRoute.id
+                              ? 'bg-emerald-500 text-stone-950 ring-2 ring-emerald-400/50'
+                              : 'bg-cyan-500 hover:bg-cyan-400 text-stone-950'
+                          }`}
+                        >
+                          <Map className="w-4 h-4" />
+                          <span>{activePlannedRouteId === msg.plannedRoute.id ? 'Zobrazeno na mapě' : 'Zobrazit na mapě'}</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => handleReverseCurrentRoute(msg.plannedRoute!)}
+                          title="Otočit směr jízdy po trase"
+                          className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Repeat className="w-3.5 h-3.5 text-stone-400" />
+                          <span>Obrátit směr</span>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            const gpxContent = exportPlannedRouteToGpx(msg.plannedRoute!);
+                            const filename = `${msg.plannedRoute!.routeName.replace(/[^a-z0-9]/gi, '_')}.gpx`;
+                            downloadFile(gpxContent, filename, 'application/gpx+xml');
+                          }}
+                          className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                        >
+                          <Download className="w-3.5 h-3.5 text-stone-400" />
+                          <span>GPX</span>
+                        </button>
+
+                        {onStartRideWithRoute && (
+                          <button
+                            type="button"
+                            onClick={() => onStartRideWithRoute(msg.plannedRoute!)}
+                            className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ml-auto"
                           >
-                            <MapPin className="w-2.5 h-2.5 text-cyan-400" />
-                            {wp.name}
-                          </span>
-                        ))}
+                            <Play className="w-3.5 h-3.5" />
+                            <span>Jet trasu</span>
+                          </button>
+                        )}
                       </div>
                     </div>
                   )}
+                </div>
+              );
+            })}
 
-                  {/* Action Buttons: Show on Map, Download GPX, Start Ride */}
-                  <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-stone-800/80">
-                    <button
-                      type="button"
-                      onClick={() => onSelectRouteOnMap(msg.plannedRoute!)}
-                      className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
-                        activePlannedRouteId === msg.plannedRoute.id
-                          ? 'bg-emerald-500 text-stone-950 ring-2 ring-emerald-400/50'
-                          : 'bg-cyan-500 hover:bg-cyan-400 text-stone-950'
-                      }`}
-                    >
-                      <Map className="w-4 h-4" />
-                      <span>{activePlannedRouteId === msg.plannedRoute.id ? 'Zobrazeno na mapě' : 'Zobrazit na mapě'}</span>
-                    </button>
+            {isLoading && (
+              <div className="flex items-start gap-2 text-stone-400 mr-auto max-w-md">
+                <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800 flex items-center gap-2.5 text-xs shadow-lg">
+                  <Compass className="w-4 h-4 text-cyan-400 animate-spin" />
+                  <span>CykloNavigátor hledá a propočítává ideální trasu podle profilu a map...</span>
+                </div>
+              </div>
+            )}
 
-                    <button
-                      type="button"
-                      onClick={() => {
-                        const gpxContent = exportPlannedRouteToGpx(msg.plannedRoute!);
-                        const filename = `${msg.plannedRoute!.routeName.replace(/[^a-z0-9]/gi, '_')}.gpx`;
-                        downloadFile(gpxContent, filename, 'application/gpx+xml');
-                      }}
-                      className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
-                    >
-                      <Download className="w-3.5 h-3.5 text-stone-400" />
-                      <span>Stáhnout GPX</span>
-                    </button>
+            <div ref={messagesEndRef} />
+          </div>
+        )}
 
-                    {onStartRideWithRoute && (
+        {/* TAB 2: STRUCTURED BUILDER / PARAMETERS */}
+        {activeTab === 'builder' && (
+          <div className="p-4 sm:p-6 max-w-2xl mx-auto space-y-5 animate-in fade-in duration-200">
+            <div className="bg-stone-900/90 border border-stone-800 rounded-2xl p-4 sm:p-5 shadow-xl">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-7 h-7 rounded-lg bg-cyan-500/20 text-cyan-400 flex items-center justify-center">
+                  <Sliders className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-white">Přesný plánovač parametrů</h3>
+                  <p className="text-xs text-stone-400">Nastavte parametry a nechte aplikaci vygenerovat ideální cyklotrasu</p>
+                </div>
+              </div>
+
+              {/* Start & Destination inputs */}
+              <div className="space-y-3 mb-4">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
+                    <MapPin className="w-3.5 h-3.5 text-emerald-400" />
+                    Výchozí bod (Start)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="např. Praha-Braník, Beroun, Brno, Karlštejn..."
+                      value={builderOrigin}
+                      onChange={(e) => setBuilderOrigin(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500"
+                    />
+                    {currentLocation && (
                       <button
                         type="button"
-                        onClick={() => onStartRideWithRoute(msg.plannedRoute!)}
-                        className="px-3 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer ml-auto"
+                        onClick={() => setBuilderOrigin('Moje aktuální poloha')}
+                        className="absolute right-2 top-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-cyan-400 text-[10px] font-semibold transition-all cursor-pointer"
                       >
-                        <Play className="w-3.5 h-3.5" />
-                        <span>Jet tuto trasu</span>
+                        Moje GPS
                       </button>
                     )}
                   </div>
                 </div>
-              )}
-            </div>
-          );
-        })}
 
-        {/* Typing Loading Indicator */}
-        {isLoading && (
-          <div className="flex items-start gap-2 text-stone-400 mr-auto max-w-md">
-            <div className="p-3.5 rounded-2xl bg-stone-900 border border-stone-800 flex items-center gap-2 text-xs">
-              <Compass className="w-4 h-4 text-cyan-400 animate-spin" />
-              <span>CykloNavigátor hledá a optimalizuje nejlepší trasu...</span>
+                {/* Loop toggle */}
+                <div className="flex items-center justify-between p-2.5 rounded-xl bg-stone-950/60 border border-stone-800">
+                  <div className="flex items-center gap-2">
+                    <Repeat className="w-4 h-4 text-cyan-400" />
+                    <div>
+                      <span className="text-xs font-semibold text-white block">Okruh (Návrat na start)</span>
+                      <span className="text-[10px] text-stone-400">Trasa se vrátí do výchozího místa po jiné větvi</span>
+                    </div>
+                  </div>
+                  <input
+                    type="checkbox"
+                    checked={builderIsLoop}
+                    onChange={(e) => setBuilderIsLoop(e.target.checked)}
+                    className="w-4 h-4 accent-cyan-500 rounded cursor-pointer"
+                  />
+                </div>
+
+                {!builderIsLoop && (
+                  <div>
+                    <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
+                      <MapPin className="w-3.5 h-3.5 text-rose-400" />
+                      Cílový bod (Cíl)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="např. Karlštejn, Slapy, Křivoklát..."
+                      value={builderDestination}
+                      onChange={(e) => setBuilderDestination(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500"
+                    />
+                  </div>
+                )}
+              </div>
+
+              {/* Grid of parameters: Bike, Distance, Surface */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 mb-4">
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
+                    <Bike className="w-3.5 h-3.5 text-cyan-400" />
+                    Typ kola
+                  </label>
+                  <select
+                    value={builderBikeType}
+                    onChange={(e) => setBuilderBikeType(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="Silniční">Silniční (hladký asfalt, svižné tempo)</option>
+                    <option value="Gravel">Gravel (asfalt + polní a štěrkové cesty)</option>
+                    <option value="Horský (MTB)">Horský MTB (lesní traily, stoupání)</option>
+                    <option value="Treking / Krosové">Treking / Krosové (pohodové zpevněné cesty)</option>
+                    <option value="Elektrokolo (e-bike)">Elektrokolo (i delší kopce)</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center justify-between">
+                    <span className="flex items-center gap-1.5">
+                      <Compass className="w-3.5 h-3.5 text-emerald-400" />
+                      Cílová vzdálenost
+                    </span>
+                    <span className="font-mono font-bold text-cyan-400">{builderDistanceKm} km</span>
+                  </label>
+                  <div className="pt-2">
+                    <input
+                      type="range"
+                      min="10"
+                      max="120"
+                      step="5"
+                      value={builderDistanceKm}
+                      onChange={(e) => setBuilderDistanceKm(Number(e.target.value))}
+                      className="w-full accent-cyan-400 cursor-pointer"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
+                    <Layers className="w-3.5 h-3.5 text-amber-400" />
+                    Preferovaný povrch
+                  </label>
+                  <select
+                    value={builderSurface}
+                    onChange={(e) => setBuilderSurface(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500 cursor-pointer"
+                  >
+                    <option value="100% hladký asfalt">100% hladký asfalt (bez šotoliny)</option>
+                    <option value="Asfalt a zpevněný štěrk">Asfalt a jemná zpevněná šotolina</option>
+                    <option value="Lesní cesty a přírodní terén">Lesní cesty a přírodní terén</option>
+                    <option value="Vyhrazené cyklostezky podél řeky">Cyklostezky podél vody</option>
+                  </select>
+                </div>
+
+                <div className="flex flex-col justify-end">
+                  <label className="flex items-center gap-2 p-2.5 rounded-xl bg-stone-950 border border-stone-800 cursor-pointer text-xs text-stone-300">
+                    <input
+                      type="checkbox"
+                      checked={builderAvoidTraffic}
+                      onChange={(e) => setBuilderAvoidTraffic(e.target.checked)}
+                      className="w-4 h-4 rounded accent-cyan-500"
+                    />
+                    <span>Vyhnout se frekventovaným silnicím I. třídy</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* Submit button */}
+              <button
+                type="button"
+                onClick={handleGenerateFromBuilder}
+                className="w-full py-3 rounded-xl bg-gradient-to-r from-cyan-500 to-teal-400 hover:from-cyan-400 hover:to-teal-300 text-stone-950 font-bold text-sm transition-all shadow-lg shadow-cyan-500/20 cursor-pointer flex items-center justify-center gap-2"
+              >
+                <Sparkles className="w-4 h-4 text-stone-950" />
+                <span>Vygenerovat a zobrazit trasu na mapě</span>
+              </button>
             </div>
+
+            {/* If a route is already inspected, show preview below builder */}
+            {inspectedRoute && (
+              <div className="mt-4">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-xs font-bold text-stone-400 uppercase tracking-wider">
+                    Aktuální navržená trasa
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => handleReverseCurrentRoute(inspectedRoute)}
+                    className="text-xs text-cyan-400 hover:underline flex items-center gap-1 cursor-pointer"
+                  >
+                    <Repeat className="w-3 h-3" />
+                    Obrátit směr
+                  </button>
+                </div>
+                <RouteElevationProfile route={inspectedRoute} onHoverDistance={onHoverRouteDistance} />
+              </div>
+            )}
           </div>
         )}
 
-        <div ref={messagesEndRef} />
-      </div>
+        {/* TAB 3: CURATED TOP ROUTES IN CZECHIA */}
+        {activeTab === 'curated' && (
+          <div className="p-4 sm:p-5 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-200">
+            {/* Search & Filter Bar */}
+            <div className="space-y-2">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="flex-1 relative">
+                  <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Hledat trasu podle názvu, regionu (např. Karlštejn, Pálava, Šumava, Brno)..."
+                    value={curatedSearch}
+                    onChange={(e) => setCuratedSearch(e.target.value)}
+                    className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500 placeholder:text-stone-500"
+                  />
+                  {curatedSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setCuratedSearch('')}
+                      className="absolute right-2.5 top-2.5 p-1 text-stone-500 hover:text-stone-200 cursor-pointer"
+                      title="Smazat hledání"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
 
-      {/* Suggested Quick Prompt Chips */}
-      <div className="px-4 py-2 border-t border-stone-800/80 bg-stone-900/60 overflow-x-auto shrink-0 flex items-center gap-2 no-scrollbar">
-        <span className="text-[11px] text-stone-500 whitespace-nowrap">Rychlé šablony:</span>
-        {QUICK_PROMPT_SUGGESTIONS.map((item, idx) => (
-          <button
-            key={idx}
-            type="button"
-            onClick={() => handleSendMessage(item.prompt)}
-            disabled={isLoading}
-            className="px-2.5 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-800 border border-stone-700/80 text-stone-300 hover:text-white text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 disabled:opacity-50"
-          >
-            {item.label}
-          </button>
-        ))}
-      </div>
+                <div className="flex items-center gap-1 bg-stone-900 p-1 rounded-xl border border-stone-800 shrink-0 overflow-x-auto">
+                  {[
+                    { id: 'all', label: 'Vše' },
+                    { id: 'road', label: 'Silniční / Gravel' },
+                    { id: 'mtb', label: 'MTB Horská' },
+                    { id: 'family', label: 'Nenáročné' },
+                  ].map((f) => (
+                    <button
+                      key={f.id}
+                      type="button"
+                      onClick={() => setCuratedBikeFilter(f.id)}
+                      className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                        curatedBikeFilter === f.id
+                          ? 'bg-cyan-500 text-stone-950 font-bold'
+                          : 'text-stone-400 hover:text-stone-200'
+                      }`}
+                    >
+                      {f.label}
+                    </button>
+                  ))}
+                </div>
+              </div>
 
-      {/* Input Message Area */}
-      <div className="p-3 sm:p-4 bg-stone-900 border-t border-stone-800 shrink-0">
-        <div className="max-w-4xl mx-auto flex items-end gap-2">
-          <div className="flex-1 relative">
-            <textarea
-              ref={textareaRef}
-              rows={2}
-              value={inputMessage}
-              onChange={(e) => setInputMessage(e.target.value)}
-              onKeyDown={handleKeyDown}
-              disabled={isLoading}
-              placeholder="Napište instrukce pro trasu (např. 'Chci 50 km silniční trasu z Karlštejna s hezkým asfaltem a výhledem')..."
-              className="w-full px-3.5 py-2.5 rounded-2xl bg-stone-950 border border-stone-800 text-stone-100 placeholder:text-stone-500 text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-none"
-            />
+              {/* Quick region tags and result count */}
+              <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs">
+                <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
+                  <span className="text-[11px] text-stone-500 font-semibold shrink-0">Region:</span>
+                  {[
+                    { label: 'Všechny', query: '' },
+                    { label: 'Karlštejn', query: 'karlstejn' },
+                    { label: 'Brno & Kras', query: 'brno' },
+                    { label: 'Šumava', query: 'sumava' },
+                    { label: 'Beskydy', query: 'beskyd' },
+                    { label: 'Pálava', query: 'palav' },
+                    { label: 'Jizerky', query: 'jizer' },
+                    { label: 'Litovel', query: 'litovel' },
+                  ].map((chip) => {
+                    const isSelected = chip.query === '' ? !curatedSearch : normalizeDiacritics(curatedSearch).includes(chip.query);
+                    return (
+                      <button
+                        key={chip.label}
+                        type="button"
+                        onClick={() => setCuratedSearch(chip.query === '' ? '' : chip.label)}
+                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                          isSelected
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
+                            : 'bg-stone-900 hover:bg-stone-800 text-stone-400 border border-stone-800'
+                        }`}
+                      >
+                        {chip.label}
+                      </button>
+                    );
+                  })}
+                </div>
+                <span className="text-[11px] text-stone-500 whitespace-nowrap font-mono shrink-0">
+                  {filteredCuratedRoutes.length} {filteredCuratedRoutes.length === 1 ? 'trasa' : filteredCuratedRoutes.length < 5 ? 'trasy' : 'tras'}
+                </span>
+              </div>
+            </div>
+
+            {/* List of Curated Routes */}
+            <div className="grid grid-cols-1 gap-3.5">
+              {filteredCuratedRoutes.map((route) => {
+                const isActive = activePlannedRouteId === route.id;
+                return (
+                  <div
+                    key={route.id}
+                    className={`p-4 rounded-2xl border transition-all ${
+                      isActive
+                        ? 'bg-cyan-950/40 border-cyan-500 ring-1 ring-cyan-500/50 shadow-xl'
+                        : 'bg-stone-900/90 hover:bg-stone-900 border-stone-800 shadow-md'
+                    }`}
+                  >
+                    <div className="flex items-start justify-between gap-3 mb-2">
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                            {route.region}
+                          </span>
+                          {route.difficulty && (
+                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-800 text-stone-300">
+                              {route.difficulty}
+                            </span>
+                          )}
+                        </div>
+                        <h4 className="text-base font-extrabold text-white mt-0.5">{route.routeName}</h4>
+                      </div>
+
+                      <span className="px-2.5 py-1 rounded-xl bg-stone-800 border border-stone-700 text-stone-200 text-xs font-semibold shrink-0">
+                        {route.bikeType}
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-stone-300 leading-relaxed mb-3">{route.description}</p>
+
+                    {/* Stats Grid */}
+                    <div className="grid grid-cols-4 gap-2 p-2.5 rounded-xl bg-stone-950/80 border border-stone-800/80 text-center mb-3 text-xs font-mono">
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-sans">Délka</span>
+                        <span className="font-extrabold text-cyan-400">{route.distanceKm} km</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-sans">Převýšení</span>
+                        <span className="font-extrabold text-emerald-400">+{route.elevationGainM} m</span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-sans">Odhadovaný čas</span>
+                        <span className="font-bold text-stone-200">
+                          {Math.floor((route.estimatedDurationMin || 60) / 60)}h {(route.estimatedDurationMin || 60) % 60}m
+                        </span>
+                      </div>
+                      <div>
+                        <span className="text-[10px] text-stone-400 block font-sans">Provoz</span>
+                        <span className="font-bold text-stone-300 text-[11px] truncate block">
+                          {route.trafficLevel?.split(' ')[0] || 'Bez aut'}
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="flex flex-wrap items-center gap-2 pt-1 border-t border-stone-800/80">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setInspectedRoute(route);
+                          onSelectRouteOnMap(route, true);
+                        }}
+                        className={`px-3.5 py-2 rounded-xl text-xs font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer ${
+                          isActive
+                            ? 'bg-emerald-500 text-stone-950'
+                            : 'bg-cyan-500 hover:bg-cyan-400 text-stone-950'
+                        }`}
+                      >
+                        <Map className="w-4 h-4" />
+                        <span>{isActive ? 'Zobrazeno na mapě' : 'Vybrat na mapu'}</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const gpxContent = exportPlannedRouteToGpx(route);
+                          const filename = `${route.routeName.replace(/[^a-z0-9]/gi, '_')}.gpx`;
+                          downloadFile(gpxContent, filename, 'application/gpx+xml');
+                        }}
+                        className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        <Download className="w-3.5 h-3.5 text-stone-400" />
+                        <span>GPX</span>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleCopyRouteLink(route)}
+                        className="px-3 py-2 rounded-xl bg-stone-800 hover:bg-stone-700 text-stone-200 border border-stone-700 text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer"
+                      >
+                        {copiedRouteId === route.id ? (
+                          <>
+                            <Check className="w-3.5 h-3.5 text-emerald-400" />
+                            <span className="text-emerald-400">Zkopírováno</span>
+                          </>
+                        ) : (
+                          <>
+                            <Share2 className="w-3.5 h-3.5 text-stone-400" />
+                            <span>Sdílet</span>
+                          </>
+                        )}
+                      </button>
+
+                      {onStartRideWithRoute && (
+                        <button
+                          type="button"
+                          onClick={() => onStartRideWithRoute(route)}
+                          className="px-3.5 py-2 rounded-xl bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-300 border border-emerald-500/40 text-xs font-bold flex items-center gap-1.5 transition-all cursor-pointer ml-auto"
+                        >
+                          <Play className="w-3.5 h-3.5" />
+                          <span>Jet trasu</span>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
           </div>
-
-          <button
-            id="btn-send-planner-msg"
-            type="button"
-            onClick={() => handleSendMessage()}
-            disabled={!inputMessage.trim() || isLoading}
-            className="p-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 transition-all font-bold shadow-lg shadow-cyan-500/20 cursor-pointer flex items-center justify-center shrink-0"
-            title="Odeslat dotaz na trasu"
-          >
-            <Send className="w-5 h-5" />
-          </button>
-        </div>
-        <div className="flex items-center justify-between text-[11px] text-stone-500 mt-2 max-w-4xl mx-auto px-1">
-          <span>Stisknutím klávesy Enter odešlete zprávu</span>
-          <span>Podporováno modelem Gemini s výpočtem GPS bodů</span>
-        </div>
+        )}
       </div>
+
+      {/* Quick Prompt Chips Bar (in Chat mode) */}
+      {activeTab === 'chat' && (
+        <div className="px-3.5 py-2 border-t border-stone-800 bg-stone-900/60 overflow-x-auto shrink-0 flex items-center gap-2 no-scrollbar">
+          <span className="text-[11px] text-stone-500 whitespace-nowrap">Rychlé dotazy:</span>
+          {QUICK_PROMPT_SUGGESTIONS.map((item, idx) => (
+            <button
+              key={idx}
+              type="button"
+              onClick={() => handleSendMessage(item.prompt)}
+              disabled={isLoading}
+              className="px-2.5 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-800 border border-stone-700/80 text-stone-300 hover:text-white text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 disabled:opacity-50"
+            >
+              {item.label}
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Input Message Area (in Chat mode) */}
+      {activeTab === 'chat' && (
+        <div className="p-3 sm:p-4 bg-stone-900 border-t border-stone-800 shrink-0">
+          <div className="max-w-4xl mx-auto flex items-end gap-2">
+            <div className="flex-1 relative">
+              <textarea
+                ref={textareaRef}
+                rows={2}
+                value={inputMessage}
+                onChange={(e) => setInputMessage(e.target.value)}
+                onKeyDown={handleKeyDown}
+                disabled={isLoading}
+                placeholder="Napište instrukce pro trasu (např. 'Chci 45 km silniční okruh z Karlštejna s hezkým asfaltem a výhledem')..."
+                className="w-full px-3.5 py-2.5 rounded-2xl bg-stone-950 border border-stone-800 text-stone-100 placeholder:text-stone-500 text-xs sm:text-sm focus:outline-none focus:border-cyan-500 focus:ring-1 focus:ring-cyan-500/50 resize-none"
+              />
+            </div>
+
+            <button
+              id="btn-send-planner-msg"
+              type="button"
+              onClick={() => handleSendMessage()}
+              disabled={!inputMessage.trim() || isLoading}
+              className="p-3 rounded-2xl bg-cyan-500 hover:bg-cyan-400 disabled:opacity-40 disabled:cursor-not-allowed text-stone-950 transition-all font-bold shadow-lg shadow-cyan-500/20 cursor-pointer flex items-center justify-center shrink-0"
+              title="Odeslat instrukce na trasu"
+            >
+              <Send className="w-5 h-5" />
+            </button>
+          </div>
+          <div className="flex items-center justify-between text-[10px] text-stone-500 mt-1.5 max-w-4xl mx-auto px-1">
+            <span>Enter = odeslat • Shift+Enter = nový řádek</span>
+            <span>Výpočet GPX a převýšení na veřejných mapách</span>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

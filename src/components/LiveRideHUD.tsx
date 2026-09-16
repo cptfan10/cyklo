@@ -20,6 +20,7 @@ interface LiveRideHUDProps {
   isScreenLocked?: boolean;
   isWakeLockSupported?: boolean;
   onToggleScreenLock?: () => void;
+  onOpenCockpit?: () => void;
   onStart: (simulate: boolean) => void;
   onPause: () => void;
   onResume: () => void;
@@ -54,6 +55,7 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
   isScreenLocked = false,
   isWakeLockSupported = false,
   onToggleScreenLock,
+  onOpenCockpit,
   onStart,
   onPause,
   onResume,
@@ -118,6 +120,23 @@ export const LiveRideHUD: React.FC<LiveRideHUDProps> = ({
                 onToggleScreenLock();
               }}
             />
+          )}
+
+          {/* Fullscreen Handlebar Cockpit Mode */}
+          {onOpenCockpit && (
+            <button
+              id="btn-open-cockpit"
+              type="button"
+              onClick={() => {
+                triggerHaptic(30);
+                onOpenCockpit();
+              }}
+              title="Otevřít celoobrazovkový režim na řídítka (Cockpit)"
+              className="px-2.5 py-1 rounded-full bg-stone-800 hover:bg-stone-700 text-stone-300 hover:text-white border border-stone-700 text-[10px] sm:text-[11px] font-bold flex items-center gap-1.5 transition-all cursor-pointer"
+            >
+              <Smartphone className="w-3.5 h-3.5 text-emerald-400" />
+              <span>Cockpit</span>
+            </button>
           )}
         </div>
 

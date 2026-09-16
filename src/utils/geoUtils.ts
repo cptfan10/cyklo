@@ -1,4 +1,4 @@
-import { GpsPoint, RideData } from '../types';
+import { GpsPoint, RideData, PlannedRoute } from '../types';
 
 /**
  * Calculates distance between two points in kilometers using the Haversine formula
@@ -91,6 +91,43 @@ export function exportToGpx(ride: RideData): string {
   return `${gpxHeader}\n${pointsXml}${gpxFooter}`;
 }
 
+/**
+ * Exports a planned route as a standard GPX file with route points and waypoints
+ */
+export function exportPlannedRouteToGpx(route: PlannedRoute): string {
+  const gpxHeader = `<?xml version="1.0" encoding="UTF-8"?>
+<gpx version="1.1" creator="CyklistickyAsistent-Planovac" xmlns="http://www.topografix.com/GPX/1/1">
+  <metadata>
+    <name>${escapeXml(route.routeName)}</name>
+    <desc>${escapeXml(`Vzdálenost: ${route.distanceKm} km, převýšení: ${route.elevationGainM} m, kolo: ${route.bikeType || 'libovolné'}`)}</desc>
+    <time>${new Date().toISOString()}</time>
+  </metadata>`;
+
+  const waypointsXml = (route.waypoints || [])
+    .map((wp) => `  <wpt lat="${wp.lat.toFixed(6)}" lon="${wp.lng.toFixed(6)}">
+    <name>${escapeXml(wp.name)}</name>
+    ${wp.note ? `<desc>${escapeXml(wp.note)}</desc>` : ''}
+  </wpt>`)
+    .join('\n');
+
+  const routePointsXml = route.coordinates
+    .map(([lat, lng]) => `      <trkpt lat="${lat.toFixed(6)}" lon="${lng.toFixed(6)}"></trkpt>`)
+    .join('\n');
+
+  const gpxBody = `
+${waypointsXml}
+  <trk>
+    <name>${escapeXml(route.routeName)}</name>
+    <type>cycling</type>
+    <trkseg>
+${routePointsXml}
+    </trkseg>
+  </trk>
+</gpx>`;
+
+  return `${gpxHeader}${gpxBody}`;
+}
+
 function escapeXml(unsafe: string): string {
   return unsafe.replace(/[<>&'"]/g, (c) => {
     switch (c) {
@@ -117,6 +154,63 @@ export function downloadFile(content: string, fileName: string, contentType: str
   a.click();
   document.body.removeChild(a);
   URL.revokeObjectURL(url);
+}
+
+/**
+ * Reverses a planned route direction (useful for headwind/tailwinds or returning)
+ */
+export function reversePlannedRoute(route: PlannedRoute): PlannedRoute {
+  const reversedCoordinates = [...route.coordinates].reverse();
+  const reversedWaypoints = route.waypoints
+    ? [...route.waypoints].reverse().map((wp, idx, arr) => {
+        let name = wp.name;
+        if (idx === 0) name = wp.name.replace(/Cíl|C\b/gi, 'Start');
+        else if (idx === arr.length - 1) name = wp.name.replace(/Start|S\b/gi, 'Cíl');
+        return { ...wp, name };
+      })
+    : [];
+
+  const reversedElevation = route.elevationProfile
+    ? [...route.elevationProfile].reverse().map((ep) => ({
+        distanceKm: Number((route.distanceKm - ep.distanceKm).toFixed(1)),
+        altitudeM: ep.altitudeM,
+      }))
+    : undefined;
+
+  return {
+    ...route,
+    id: `route_rev_${Date.now()}`,
+    routeName: `${route.routeName} (Obrácený směr)`,
+    coordinates: reversedCoordinates,
+    waypoints: reversedWaypoints,
+    elevationProfile: reversedElevation,
+  };
+}
+
+/**
+ * Finds the geographic coordinate along a route at a given cumulative distance
+ */
+export function getCoordinateAtDistance(route: PlannedRoute, targetDistanceKm: number): [number, number] | null {
+  if (!route.coordinates || route.coordinates.length === 0) return null;
+  if (targetDistanceKm <= 0) return route.coordinates[0];
+  if (targetDistanceKm >= route.distanceKm) return route.coordinates[route.coordinates.length - 1];
+
+  let cumulativeKm = 0;
+  for (let i = 0; i < route.coordinates.length - 1; i++) {
+    const [lat1, lng1] = route.coordinates[i];
+    const [lat2, lng2] = route.coordinates[i + 1];
+    const segmentKm = calculateDistanceKm(lat1, lng1, lat2, lng2);
+
+    if (cumulativeKm + segmentKm >= targetDistanceKm) {
+      const ratio = segmentKm > 0 ? (targetDistanceKm - cumulativeKm) / segmentKm : 0;
+      const interpLat = lat1 + (lat2 - lat1) * ratio;
+      const interpLng = lng1 + (lng2 - lng1) * ratio;
+      return [interpLat, interpLng];
+    }
+    cumulativeKm += segmentKm;
+  }
+
+  return route.coordinates[route.coordinates.length - 1];
 }
 
 /**
