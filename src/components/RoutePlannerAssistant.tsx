@@ -4,6 +4,7 @@ import { exportPlannedRouteToGpx, downloadFile, reversePlannedRoute } from '../u
 import { CURATED_ROUTES } from '../data/curatedRoutes';
 import { RouteElevationProfile } from './RouteElevationProfile';
 import { searchMatches, generateSmartCzechRoute } from '../utils/czechGeoPlanner';
+import { BLANSKO_MUNICIPALITIES, BlanskoMunicipality } from '../data/blanskoMunicipalities';
 import {
   Compass,
   Send,
@@ -28,6 +29,10 @@ import {
   Flame,
   ArrowRight,
   Bookmark,
+  Building,
+  Building2,
+  Landmark,
+  Home,
   X
 } from 'lucide-react';
 import Markdown from 'react-markdown';
@@ -49,24 +54,32 @@ interface RoutePlannerAssistantProps {
   onHoverRouteDistance?: (distanceKm: number | null) => void;
 }
 
-type PlannerTab = 'chat' | 'builder' | 'curated';
+type PlannerTab = 'chat' | 'builder' | 'blansko' | 'curated';
 
 const QUICK_PROMPT_SUGGESTIONS = [
+  {
+    label: '🏰 Blansko – Macocha – Jedovnice (38 km)',
+    prompt: 'Naplánuj malebný cyklookruh Moravským krasem z Blanska přes Skalní mlýn, Propast Macocha, rybník Olšovec v Jedovnicích a Křtiny.',
+  },
+  {
+    label: '🌲 Singletrail & kras: Jedovnice – Sloup (35 km)',
+    prompt: 'Chci naplánovat gravel nebo MTB trasu z Jedovnic přes Ostrov u Macochy do Sloupu a zpět kolem jeskyní bez aut.',
+  },
+  {
+    label: '🌊 Boskovicko & přehrada Křetínka (42 km)',
+    prompt: 'Navrhni silniční trasu z Boskovic přes Letovice, kolem přehrady Křetínka, do Kunštátu a zpět do Boskovic.',
+  },
+  {
+    label: '🍺 Černá Hora – Lysice – Rájec (32 km)',
+    prompt: 'Hledám pohodovou trasu: Černá Hora (pivovar) – Porčův mlýn v Býkovicích – státní zámek Lysice – Rájec nad Svitavou.',
+  },
   {
     label: '🚴 Silniční 45 km bez aut',
     prompt: 'Hledám silniční okruh cca 45 km s hladkým asfaltem a minimem provozu aut. Žádné silnice I. třídy.',
   },
   {
-    label: '🌲 Gravel podél řeky a lesem 35 km',
-    prompt: 'Chci naplánovat gravel trasu na cca 35 km. Kombinace zpevněných šotolin, lesních cyklostezek a údolí řeky.',
-  },
-  {
     label: '☕ Pohodová rovinatá trasa 25 km',
     prompt: 'Doporuč nenáročnou rovinatou trasu na cca 25 km po vyhrazené cyklostezce s možností zastávky na kávu nebo občerstvení.',
-  },
-  {
-    label: '⛰️ Kopcovitý MTB trénink',
-    prompt: 'Potřebuji tréninkovou trasu pro horské kolo (MTB) na cca 30 km s převýšením alespoň +450 m, techničtější sjezdy a lesní cesty.',
   },
 ];
 
@@ -310,6 +323,43 @@ export const RoutePlannerAssistant: React.FC<RoutePlannerAssistantProps> = ({
   // Curated routes catalog filter state
   const [curatedBikeFilter, setCuratedBikeFilter] = useState('all');
   const [curatedSearch, setCuratedSearch] = useState('');
+
+  // Blansko district municipalities state & filter
+  const [blanskoSearch, setBlanskoSearch] = useState('');
+  const [blanskoTypeFilter, setBlanskoTypeFilter] = useState<'all' | 'město' | 'městys' | 'obec' | 'památka'>('all');
+
+  const filteredBlanskoMunicipalities = React.useMemo(() => {
+    let list = BLANSKO_MUNICIPALITIES;
+    if (blanskoTypeFilter !== 'all') {
+      list = list.filter((m) => m.type === blanskoTypeFilter);
+    }
+    if (blanskoSearch.trim()) {
+      const q = normalizeDiacritics(blanskoSearch);
+      list = list.filter((m) => {
+        const nameNorm = normalizeDiacritics(m.name);
+        const descNorm = normalizeDiacritics(m.cyclingHighlight || '');
+        return nameNorm.includes(q) || descNorm.includes(q);
+      });
+    }
+    return list;
+  }, [blanskoSearch, blanskoTypeFilter]);
+
+  const handleSelectBlanskoAsStart = (m: BlanskoMunicipality) => {
+    setBuilderOrigin(m.name);
+    setActiveTab('builder');
+  };
+
+  const handleSelectBlanskoAsDest = (m: BlanskoMunicipality) => {
+    setBuilderIsLoop(false);
+    setBuilderDestination(m.name);
+    setActiveTab('builder');
+  };
+
+  const handlePlanLoopFromBlansko = (m: BlanskoMunicipality) => {
+    const prompt = `Naplánuj hezký cyklookruh se startem a cílem v ${m.name} (okres Blansko, ${m.elevationM} m n. m.) na cca 35-45 km s minimem aut, po cyklotrasách a kolem místních zajímavostí.`;
+    setActiveTab('chat');
+    handleSendMessage(prompt);
+  };
 
   // Selected route for elevation inspect
   const [inspectedRoute, setInspectedRoute] = useState<PlannedRoute | null>(() => {
@@ -602,6 +652,25 @@ ${JSON.stringify(fallbackRoute, null, 2)}
         </button>
 
         <button
+          id="btn-tab-blansko-district"
+          type="button"
+          onClick={() => setActiveTab('blansko')}
+          className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
+            activeTab === 'blansko'
+              ? 'bg-amber-400 text-stone-950 shadow-md font-bold'
+              : 'bg-stone-800/80 hover:bg-stone-800 text-stone-300'
+          }`}
+        >
+          <Building className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
+          <span>Okres Blansko</span>
+          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+            activeTab === 'blansko' ? 'bg-stone-950/40 text-stone-950' : 'bg-amber-500/20 text-amber-300'
+          }`}>
+            {BLANSKO_MUNICIPALITIES.length} obcí
+          </span>
+        </button>
+
+        <button
           type="button"
           onClick={() => setActiveTab('curated')}
           className={`px-3 py-1.5 rounded-xl text-xs font-semibold flex items-center gap-1.5 transition-all cursor-pointer whitespace-nowrap ${
@@ -754,6 +823,15 @@ ${JSON.stringify(fallbackRoute, null, 2)}
 
               {/* Start & Destination inputs */}
               <div className="space-y-3 mb-4">
+                {/* HTML Datalist for all 116 Blansko municipalities + Czech hubs */}
+                <datalist id="blansko-municipalities-datalist">
+                  {BLANSKO_MUNICIPALITIES.map((m) => (
+                    <option key={m.id} value={m.name}>
+                      {m.type === 'město' ? 'Město' : m.type === 'městys' ? 'Městys' : m.type === 'památka' ? 'Památka' : 'Obec'} (okres Blansko, {m.elevationM} m n. m.){m.cyclingHighlight ? ` – ${m.cyclingHighlight}` : ''}
+                    </option>
+                  ))}
+                </datalist>
+
                 <div>
                   <label className="block text-xs font-semibold text-stone-300 mb-1 flex items-center gap-1.5">
                     <MapPin className="w-3.5 h-3.5 text-emerald-400" />
@@ -762,7 +840,8 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                   <div className="relative">
                     <input
                       type="text"
-                      placeholder="např. Praha-Braník, Beroun, Brno, Karlštejn..."
+                      list="blansko-municipalities-datalist"
+                      placeholder="např. Blansko, Boskovice, Jedovnice, Praha..."
                       value={builderOrigin}
                       onChange={(e) => setBuilderOrigin(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500"
@@ -804,13 +883,66 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                     </label>
                     <input
                       type="text"
-                      placeholder="např. Karlštejn, Slapy, Křivoklát..."
+                      list="blansko-municipalities-datalist"
+                      placeholder="např. Jedovnice, Macocha, Letovice, Křtiny..."
                       value={builderDestination}
                       onChange={(e) => setBuilderDestination(e.target.value)}
                       className="w-full px-3.5 py-2.5 rounded-xl bg-stone-950 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-cyan-500"
                     />
                   </div>
                 )}
+
+                {/* Quick Blansko district selector chips */}
+                <div className="pt-2 border-t border-stone-800/60">
+                  <div className="flex items-center justify-between mb-1.5">
+                    <span className="text-[11px] font-medium text-amber-400 flex items-center gap-1">
+                      <Building2 className="w-3 h-3" />
+                      Rychlý výběr – Okres Blansko:
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setActiveTab('blansko')}
+                      className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                    >
+                      Katalog všech 116 obcí <ChevronRight className="w-3 h-3" />
+                    </button>
+                  </div>
+                  <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
+                    {[
+                      'Blansko',
+                      'Boskovice',
+                      'Jedovnice',
+                      'Letovice',
+                      'Adamov',
+                      'Kunštát',
+                      'Černá Hora',
+                      'Lysice',
+                      'Sloup',
+                      'Křtiny',
+                      'Rudice',
+                      'Ostrov u Macochy',
+                      'Rájec-Jestřebí',
+                      'Suchý',
+                      'Kořenec'
+                    ].map((locName) => (
+                      <button
+                        key={locName}
+                        type="button"
+                        onClick={() => {
+                          if (builderIsLoop || !builderOrigin) {
+                            setBuilderOrigin(locName);
+                          } else {
+                            setBuilderDestination(locName);
+                          }
+                        }}
+                        className="px-2 py-0.5 rounded-lg bg-stone-950 hover:bg-amber-950/40 text-[11px] text-stone-300 hover:text-amber-300 border border-stone-800 hover:border-amber-700/50 transition-all cursor-pointer"
+                        title={`Vybrat ${locName} jako ${builderIsLoop || !builderOrigin ? 'Start' : 'Cíl'}`}
+                      >
+                        {locName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
               </div>
 
               {/* Grid of parameters: Bike, Distance, Surface */}
@@ -917,7 +1049,219 @@ ${JSON.stringify(fallbackRoute, null, 2)}
           </div>
         )}
 
-        {/* TAB 3: CURATED TOP ROUTES IN CZECHIA */}
+        {/* TAB 3: OKRES BLANSKO MUNICIPALITIES & TOWNS */}
+        {activeTab === 'blansko' && (
+          <div className="p-4 sm:p-5 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-200">
+            {/* Header info card */}
+            <div className="bg-gradient-to-r from-amber-950/40 via-stone-900 to-stone-900 border border-amber-800/30 rounded-2xl p-4 sm:p-5 shadow-lg">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <div className="p-2 rounded-xl bg-amber-500/20 text-amber-400">
+                      <Building2 className="w-5 h-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-white flex items-center gap-2">
+                        Města a obce okresu Blansko
+                        <span className="px-2 py-0.5 rounded-full bg-amber-500/20 text-amber-300 text-xs font-mono font-bold border border-amber-600/30">
+                          {filteredBlanskoMunicipalities.length} z {BLANSKO_MUNICIPALITIES.length}
+                        </span>
+                      </h3>
+                      <p className="text-xs text-stone-300">
+                        Moravský kras, Boskovická brázda, Malá Haná a údolí Svitavy
+                      </p>
+                    </div>
+                  </div>
+                  <p className="text-xs text-stone-400 mt-2 leading-relaxed">
+                    Všech 116 měst, městysů a obcí okresu Blansko s přesnými souřadnicemi, nadmořskou výškou a cyklistickými tipy. Vyberte obec jako start, cíl, nebo nechte AI vygenerovat vyhlídkový okruh.
+                  </p>
+                </div>
+              </div>
+            </div>
+
+            {/* Search & Filter Bar */}
+            <div className="space-y-2.5">
+              <div className="flex flex-col sm:flex-row gap-2.5">
+                <div className="flex-1 relative">
+                  <Search className="w-4 h-4 text-stone-500 absolute left-3 top-3" />
+                  <input
+                    type="text"
+                    placeholder="Hledat obec, město nebo památku (např. Jedovnice, Rudice, Boskovice, Macocha)..."
+                    value={blanskoSearch}
+                    onChange={(e) => setBlanskoSearch(e.target.value)}
+                    className="w-full pl-9 pr-9 py-2.5 rounded-xl bg-stone-900 border border-stone-800 text-stone-100 text-xs focus:outline-none focus:border-amber-500 placeholder:text-stone-500"
+                  />
+                  {blanskoSearch && (
+                    <button
+                      type="button"
+                      onClick={() => setBlanskoSearch('')}
+                      className="absolute right-3 top-3 text-stone-500 hover:text-stone-300 cursor-pointer"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Type Filter Pills */}
+              <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
+                <span className="text-[11px] text-stone-500 mr-1 flex items-center gap-1 shrink-0">
+                  <Filter className="w-3 h-3" />
+                  Filtr:
+                </span>
+                {[
+                  { key: 'all', label: `Všechny (${BLANSKO_MUNICIPALITIES.length})` },
+                  { key: 'město', label: 'Města (8)' },
+                  { key: 'městys', label: 'Městysy (9)' },
+                  { key: 'památka', label: 'Památky & Kras (6)' },
+                  { key: 'obec', label: 'Obce (93)' },
+                ].map((tab) => (
+                  <button
+                    key={tab.key}
+                    type="button"
+                    onClick={() => setBlanskoTypeFilter(tab.key as any)}
+                    className={`px-2.5 py-1 rounded-lg text-xs font-medium transition-all whitespace-nowrap cursor-pointer ${
+                      blanskoTypeFilter === tab.key
+                        ? 'bg-amber-500 text-stone-950 font-bold'
+                        : 'bg-stone-900 hover:bg-stone-800 text-stone-400 hover:text-stone-200 border border-stone-800'
+                    }`}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            {/* List / Grid of Municipalities */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-2.5">
+              {filteredBlanskoMunicipalities.map((m) => {
+                const isCity = m.type === 'město';
+                const isMarketTown = m.type === 'městys';
+                const isLandmark = m.type === 'památka';
+
+                return (
+                  <div
+                    key={m.id}
+                    className="p-3.5 rounded-xl bg-stone-900/90 border border-stone-800 hover:border-amber-700/40 transition-all flex flex-col justify-between group"
+                  >
+                    <div>
+                      <div className="flex items-start justify-between gap-2 mb-1.5">
+                        <div className="flex items-center gap-2">
+                          <div
+                            className={`w-7 h-7 rounded-lg flex items-center justify-center shrink-0 ${
+                              isCity
+                                ? 'bg-amber-500/20 text-amber-400'
+                                : isMarketTown
+                                ? 'bg-cyan-500/20 text-cyan-400'
+                                : isLandmark
+                                ? 'bg-emerald-500/20 text-emerald-400'
+                                : 'bg-stone-800 text-stone-300'
+                            }`}
+                          >
+                            {isCity ? (
+                              <Building2 className="w-4 h-4" />
+                            ) : isLandmark ? (
+                              <Landmark className="w-4 h-4" />
+                            ) : isMarketTown ? (
+                              <Building className="w-4 h-4" />
+                            ) : (
+                              <Home className="w-4 h-4" />
+                            )}
+                          </div>
+                          <div>
+                            <h4 className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
+                              {m.name}
+                            </h4>
+                            <div className="flex items-center gap-2 text-[11px] text-stone-400">
+                              <span className="font-mono text-stone-300 font-medium">
+                                {m.elevationM} m n. m.
+                              </span>
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Type badge */}
+                        <span
+                          className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider shrink-0 ${
+                            isCity
+                              ? 'bg-amber-950/80 text-amber-300 border border-amber-800/40'
+                              : isMarketTown
+                              ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/40'
+                              : isLandmark
+                              ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40'
+                              : 'bg-stone-800/80 text-stone-400'
+                          }`}
+                        >
+                          {m.type}
+                        </span>
+                      </div>
+
+                      {/* Cycling highlight description */}
+                      {m.cyclingHighlight && (
+                        <p className="text-xs text-stone-400 mt-1 mb-3 line-clamp-2 leading-relaxed">
+                          {m.cyclingHighlight}
+                        </p>
+                      )}
+                    </div>
+
+                    {/* Action buttons */}
+                    <div className="pt-2 border-t border-stone-800/60 flex items-center gap-1.5 flex-wrap">
+                      <button
+                        type="button"
+                        onClick={() => handleSelectBlanskoAsStart(m)}
+                        className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-[11px] text-emerald-300 font-semibold border border-stone-700 hover:border-emerald-600/40 transition-all cursor-pointer flex items-center gap-1"
+                        title={`Nastavit ${m.name} jako výchozí bod`}
+                      >
+                        <MapPin className="w-3 h-3 text-emerald-400" />
+                        Jako Start
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handleSelectBlanskoAsDest(m)}
+                        className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-[11px] text-rose-300 font-semibold border border-stone-700 hover:border-rose-600/40 transition-all cursor-pointer flex items-center gap-1"
+                        title={`Nastavit ${m.name} jako cíl`}
+                      >
+                        <MapPin className="w-3 h-3 text-rose-400" />
+                        Jako Cíl
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => handlePlanLoopFromBlansko(m)}
+                        className="ml-auto px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-[11px] text-amber-300 font-semibold border border-amber-700/40 hover:border-amber-500/60 transition-all cursor-pointer flex items-center gap-1"
+                        title={`Vygenerovat okružní cyklotrasu z ${m.name}`}
+                      >
+                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        Okruh odsud (AI)
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            {filteredBlanskoMunicipalities.length === 0 && (
+              <div className="text-center py-12 bg-stone-900/40 rounded-2xl border border-stone-800">
+                <Building className="w-8 h-8 text-stone-600 mx-auto mb-2" />
+                <p className="text-sm text-stone-300 font-medium">Žádná obec nebyla nalezena</p>
+                <p className="text-xs text-stone-500 mt-1">Zkuste změnit hledaný výraz nebo resetovat filtry.</p>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBlanskoSearch('');
+                    setBlanskoTypeFilter('all');
+                  }}
+                  className="mt-3 px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-xs text-amber-400 cursor-pointer font-medium"
+                >
+                  Zobrazit všech 116 obcí
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* TAB 4: CURATED TOP ROUTES IN CZECHIA */}
         {activeTab === 'curated' && (
           <div className="p-4 sm:p-5 max-w-4xl mx-auto space-y-4 animate-in fade-in duration-200">
             {/* Search & Filter Bar */}

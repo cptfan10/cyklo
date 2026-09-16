@@ -1,5 +1,6 @@
 import { GpsPoint, PlannedRoute, RouteWaypoint } from '../types';
 import { calculateDistanceKm } from './geoUtils';
+import { BLANSKO_MUNICIPALITIES } from '../data/blanskoMunicipalities';
 
 // Dictionary of known Czech cities, towns, regions and cycling hubs with their coordinates
 export const CZECH_GEO_LOCATIONS: Record<string, { lat: number; lng: number; defaultElevation: number; region: string }> = {
@@ -189,6 +190,26 @@ export function geocodeCzechLocation(
         name: 'Moje aktuální poloha',
         defaultElevation: elevation,
         region: 'Aktuální GPS',
+      };
+    }
+  }
+
+  // Check all towns, market towns and municipalities in Okres Blansko
+  for (const m of BLANSKO_MUNICIPALITIES) {
+    const normName = normalizeText(m.name);
+    if (
+      norm === normName ||
+      norm.startsWith(normName) ||
+      norm.includes(` ${normName}`) ||
+      norm.includes(`${normName} `) ||
+      norm.includes(normName)
+    ) {
+      return {
+        lat: m.lat,
+        lng: m.lng,
+        name: m.name,
+        defaultElevation: m.elevationM,
+        region: 'Okres Blansko',
       };
     }
   }

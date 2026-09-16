@@ -34,20 +34,31 @@ interface CyclingMapProps {
   onTileProviderChange?: (provider: MapTileProvider) => void;
 }
 
-const TILE_PROVIDERS: Record<MapTileProvider, { name: string; url: string; attribution: string; maxZoom: number; subtitle: string }> = {
+const TILE_PROVIDERS: Record<MapTileProvider, { name: string; url: string; overlayUrl?: string; attribution: string; maxZoom: number; subtitle: string; iconLabel?: string }> = {
   cyclosm: {
     name: 'CyclOSM (Cyklo-mapa)',
     subtitle: 'Cyklotrasy, stezky, povrchy a převýšení',
     url: 'https://{s}.tile-cyclosm.openstreetmap.fr/cyclosm/{z}/{x}/{y}.png',
     attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> | Cyklo data &copy; <a href="https://www.cyclosm.org">CyclOSM</a>',
     maxZoom: 19,
+    iconLabel: 'Cyklo',
   },
-  osm: {
-    name: 'OpenStreetMap Standard',
-    subtitle: 'Klasická veřejná celosvětová mapa',
-    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
-    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+  satellite: {
+    name: 'Satelitní (Letecká fotomapa)',
+    subtitle: 'Detailní letecké a družicové snímky povrchu (Esri)',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &mdash; Source: Esri, i-cubed, USDA, USGS, AEX, GeoEye, Getmapping, Aerogrid, IGN, IGP, UPR-EGP, and the GIS User Community',
     maxZoom: 19,
+    iconLabel: 'Satelit',
+  },
+  satellite_hybrid: {
+    name: 'Satelitní Hybrid (s popisy & silnicemi)',
+    subtitle: 'Letecká mapa kombinovaná s popisy obcí a silniční sítí',
+    url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+    overlayUrl: 'https://server.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+    attribution: 'Tiles &copy; Esri &copy; OpenStreetMap contributors',
+    maxZoom: 19,
+    iconLabel: 'Hybrid',
   },
   topo: {
     name: 'OpenTopoMap (Vrstevnice)',
@@ -55,6 +66,7 @@ const TILE_PROVIDERS: Record<MapTileProvider, { name: string; url: string; attri
     url: 'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
     attribution: 'Map data: &copy; OSM contributors, SRTM | Map style: &copy; OpenTopoMap',
     maxZoom: 17,
+    iconLabel: 'Topo',
   },
   voyager: {
     name: 'Carto Voyager (Svěží silniční)',
@@ -62,6 +74,15 @@ const TILE_PROVIDERS: Record<MapTileProvider, { name: string; url: string; attri
     url: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
     attribution: '&copy; OpenStreetMap contributors &copy; CARTO',
     maxZoom: 19,
+    iconLabel: 'Silnice',
+  },
+  osm: {
+    name: 'OpenStreetMap Standard',
+    subtitle: 'Klasická veřejná celosvětová mapa',
+    url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+    attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    maxZoom: 19,
+    iconLabel: 'OSM',
   },
 };
 
@@ -82,6 +103,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
   const mapContainerRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<L.Map | null>(null);
   const tileLayerRef = useRef<L.TileLayer | null>(null);
+  const overlayLayerRef = useRef<L.TileLayer | null>(null);
   const polylineRef = useRef<L.Polyline | null>(null);
   const plannedPolylineRef = useRef<L.Polyline | null>(null);
   const plannedMarkersLayerRef = useRef<L.LayerGroup | null>(null);
@@ -112,8 +134,15 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
       maxZoom: providerConfig.maxZoom,
       subdomains: 'abc',
     }).addTo(map);
-
     tileLayerRef.current = tileLayer;
+
+    if (providerConfig.overlayUrl) {
+      const overlayLayer = L.tileLayer(providerConfig.overlayUrl, {
+        attribution: '',
+        maxZoom: providerConfig.maxZoom,
+      }).addTo(map);
+      overlayLayerRef.current = overlayLayer;
+    }
 
     // Route Polyline (Recorded / Live track)
     const polyline = L.polyline([], {
@@ -155,17 +184,32 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
 
   // Update tile provider when prop changes
   useEffect(() => {
-    if (!mapInstanceRef.current || !tileLayerRef.current) return;
+    if (!mapInstanceRef.current) return;
     const providerConfig = TILE_PROVIDERS[tileProvider];
-    mapInstanceRef.current.removeLayer(tileLayerRef.current);
+
+    if (tileLayerRef.current) {
+      mapInstanceRef.current.removeLayer(tileLayerRef.current);
+      tileLayerRef.current = null;
+    }
+    if (overlayLayerRef.current) {
+      mapInstanceRef.current.removeLayer(overlayLayerRef.current);
+      overlayLayerRef.current = null;
+    }
 
     const newTileLayer = L.tileLayer(providerConfig.url, {
       attribution: providerConfig.attribution,
       maxZoom: providerConfig.maxZoom,
       subdomains: 'abc',
     }).addTo(mapInstanceRef.current);
-
     tileLayerRef.current = newTileLayer;
+
+    if (providerConfig.overlayUrl) {
+      const newOverlayLayer = L.tileLayer(providerConfig.overlayUrl, {
+        attribution: '',
+        maxZoom: providerConfig.maxZoom,
+      }).addTo(mapInstanceRef.current);
+      overlayLayerRef.current = newOverlayLayer;
+    }
   }, [tileProvider]);
 
   // Update Polyline points

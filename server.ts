@@ -26,7 +26,7 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-flash-latest", "gemini-3.8-flash"];
+const CANDIDATE_MODELS = ["gemini-3.1-flash-lite", "gemini-3.5-flash-lite", "gemini-3.6-flash"];
 
 function sanitizeHistory(history: any[], currentMessage: string): any[] {
   if (!Array.isArray(history)) return [];
@@ -233,19 +233,27 @@ ${elevation > 400 ? `Významné převýšení (${elevation} m) kladlo vysoké n�
       return res.json({ analysis: fallbackAnalysis, source: "rule-engine" });
     }
 
+    const distKm = Number(ride.distanceKm || 0);
+    const durSec = Number(ride.durationSeconds || 0);
+    const movSec = Number(ride.movingTimeSeconds || durSec);
+    const avgSpd = Number(ride.avgSpeedKmh || 0);
+    const maxSpd = Number(ride.maxSpeedKmh || 0);
+    const elevGain = Number(ride.elevationGainM || 0);
+    const elevLoss = Number(ride.elevationLossM || 0);
+    const calBurn = Number(ride.caloriesBurned || 0);
+
     const prompt = `Jsi profesionální sportovní trenér a asistent cyklistiky. Proveď podrobnou, motivující a odbornou analýzu následující cyklistické jízdy pro cyklistu.
 
 Údaje o jízdě:
 - Název trasy / jízdy: ${ride.name || "Neznámá trasa"}
-- Ujetá vzdálenost: ${ride.distanceKm} km
-- Celkový čas: ${Math.floor(ride.durationSeconds / 60)} minut (${ride.durationSeconds} s)
-- Čistý čas pohybu: ${Math.floor((ride.movingTimeSeconds || ride.durationSeconds) / 60)} minut
-- Průměrná rychlost: ${ride.avgSpeedKmh} km/h
-- Maximální rychlost: ${ride.maxSpeedKmh} km/h
-- Nastoupané převýšení (Elevation gain): ${ride.elevationGainM} m
-- Klesání (Elevation loss): ${ride.elevationLossM || 0} m
-- Odhadované spálené kalorie: ${ride.caloriesBurned} kcal
-- Průměrná kadence/tempo: ${ride.avgPace || "N/A"}
+- Ujetá vzdálenost: ${distKm.toFixed(1)} km
+- Celkový čas: ${Math.floor(durSec / 60)} minut (${durSec} s)
+- Čistý čas pohybu: ${Math.floor(movSec / 60)} minut
+- Průměrná rychlost: ${avgSpd.toFixed(1)} km/h
+- Maximální rychlost: ${maxSpd.toFixed(1)} km/h
+- Nastoupané převýšení (Elevation gain): ${elevGain} m
+- Klesání (Elevation loss): ${elevLoss} m
+- Odhadované spálené kalorie: ${calBurn} kcal
 - Typ kola/terénu: ${ride.bikeType || "Silniční / Gravel / Horský"}
 - Poznámky cyklisty k pocitu: ${ride.cyclistNotes || "Běžná jízda"}
 ${ride.elevationProfileSample && ride.elevationProfileSample.length > 0 ? `- Vzorky nadmořské výšky (m): ${ride.elevationProfileSample.slice(0, 15).join(", ")}...` : ""}
@@ -395,17 +403,84 @@ const CZECH_HUBS: CzechCityHub[] = [
   },
   {
     name: "Blansko & Moravský kras",
-    aliases: ["blansk", "macoch", "moravský kras", "jedovnic", "sloup", "adamov"],
+    aliases: [
+      "blansk", "macoch", "moravský kras", "jedovnic", "sloup", "adamov", "křtin", "rudic",
+      "balcark", "holštejn", "ostrov u macochy", "senetářov", "kotvrdovic", "vavřinec",
+      "veselic", "šošůvk", "vilémovic", "suchdol", "býčí skál", "skalní mlýn", "punkv"
+    ],
     lat: 49.3627,
     lng: 16.6447,
     baseAltitude: 280,
-    region: "Moravský kras",
+    region: "Okres Blansko / Moravský kras",
     scenicWaypoints: [
-      { name: "Blansko město", dLat: 0, dLng: 0, note: "Výchozí bod u nádraží" },
-      { name: "Skalní mlýn (kaňon)", dLat: 0.015, dLng: 0.065, note: "Vjezd do chráněného krasového údolí" },
-      { name: "Propast Macocha & Horní můstek", dLat: 0.024, dLng: 0.089, note: "Vyhlídka do 138m propasti" },
-      { name: "Rybník Olšovec (Jedovnice)", dLat: -0.025, dLng: 0.115, note: "Singletracky & občerstvení" },
-      { name: "Křtiny (poutní chrám)", dLat: -0.068, dLng: 0.098, note: "Santiniho barokní perla" },
+      { name: "Blansko město & Zámek", dLat: 0, dLng: 0, note: "Výchozí bod u zámku a nádraží" },
+      { name: "Skalní mlýn (Pustý žleb)", dLat: 0.015, dLng: 0.065, note: "Vjezd do chráněného kaňonu bez aut" },
+      { name: "Propast Macocha & Horní můstek", dLat: 0.024, dLng: 0.089, note: "Vyhlídka do 138m hlubiny" },
+      { name: "Ostrov u Macochy (Balcarka)", dLat: 0.028, dLng: 0.114, note: "Jeskyně a větrný mlýn" },
+      { name: "Jedovnice – Rybník Olšovec", dLat: -0.025, dLng: 0.115, note: "Singletracky & občerstvení" },
+      { name: "Rudice – Větrný mlýn a propadání", dLat: -0.027, dLng: 0.082, note: "Geopark a skalní vyhlídky" },
+      { name: "Křtiny – Santiniho barokní chrám", dLat: -0.068, dLng: 0.098, note: "Perla Moravy v lesích" },
+      { name: "Josefovské údolí & Stará huť", dLat: -0.059, dLng: 0.033, note: "Býčí skála a železářská huť" },
+      { name: "Adamov údolí Svitavy", dLat: -0.062, dLng: 0.008, note: "Návrat po cyklostezce 5" },
+    ],
+  },
+  {
+    name: "Boskovice & Malá Haná",
+    aliases: [
+      "boskovic", "velké opatovic", "opatovic", "šebetov", "cetkovic", "knínic",
+      "borotín", "vanovic", "svitávk", "chroudichrom", "skalic nad svitavou",
+      "suchý", "kořenec", "benešov u boskovic", "velenov", "žďárná", "valchov"
+    ],
+    lat: 49.4878,
+    lng: 16.6601,
+    baseAltitude: 381,
+    region: "Okres Blansko / Boskovicko & Malá Haná",
+    scenicWaypoints: [
+      { name: "Boskovice – Zámek a hrad", dLat: 0, dLng: 0, note: "Historické centrum a židovská čtvrť" },
+      { name: "Svitávka – Löw-Beerovy vily", dLat: 0.013, dLng: -0.058, note: "Secesní rezidence v parku" },
+      { name: "Knínice u Boskovic", dLat: 0.056, dLng: 0.018, note: "Příjemné silničky Malé Hané" },
+      { name: "Šebetov – Zámek", dLat: 0.064, dLng: 0.052, note: "Barokní zámek a lesy" },
+      { name: "Kořenec – Větrný mlýn", dLat: 0.042, dLng: 0.095, note: "Golf & Ski areál, hřebenové vyhlídky" },
+      { name: "Rybník Suchý", dLat: -0.004, dLng: 0.101, note: "Koupání a lesní občerstvení" },
+      { name: "Velenov – lesní údolí Bělé", dLat: -0.018, dLng: 0.082, note: "Vodní nádrž Boskovice" },
+    ],
+  },
+  {
+    name: "Letovice, Kunštát & Přehrada Křetínka",
+    aliases: [
+      "letovic", "kunštát", "křetín", "křetínk", "lazinov", "olešnic", "crhov",
+      "prostřední poříčí", "horní poříčí", "vranová", "sulíkov", "rozseč", "rudka"
+    ],
+    lat: 49.5483,
+    lng: 16.5775,
+    baseAltitude: 330,
+    region: "Okres Blansko / Letovicko a Kunštátsko",
+    scenicWaypoints: [
+      { name: "Letovice – Zámek a park", dLat: 0, dLng: 0, note: "Zámecký areál s vyhlídkou" },
+      { name: "Přehrada Křetínka (Lazinov)", dLat: 0.016, dLng: -0.059, note: "Rekreační okruh kolem vody" },
+      { name: "Křetín – Zámek", dLat: 0.006, dLng: -0.081, note: "Klidná zátoka nádrže" },
+      { name: "Rudka u Kunštátu", dLat: -0.032, dLng: -0.069, note: "Jeskyně Blanických rytířů & rozhledna Milenka" },
+      { name: "Kunštát – Státní zámek", dLat: -0.042, dLng: -0.061, note: "Hrnčířské městečko Jiřího z Poděbrad" },
+      { name: "Sebranice & Svitavka", dLat: -0.051, dLng: 0.008, note: "Plochý návrat po cyklotrase" },
+    ],
+  },
+  {
+    name: "Černá Hora, Lysice & Rájec",
+    aliases: [
+      "černá hora", "cerna hora", "lysic", "rájec", "rajec", "bořitov", "doubravic",
+      "býkovic", "porčův mlýn", "žernovník", "lubě", "dlouhá lhota", "krnov"
+    ],
+    lat: 49.4142,
+    lng: 16.5819,
+    baseAltitude: 328,
+    region: "Okres Blansko / Černohorsko a Lysicko",
+    scenicWaypoints: [
+      { name: "Černá Hora – Zámecký pivovar", dLat: 0, dLng: 0, note: "Start u nejstaršího pivovaru na Moravě" },
+      { name: "Býkovice – Porčův mlýn", dLat: 0.015, dLng: -0.025, note: "Klapající mlýn a rybníček" },
+      { name: "Lysice – Státní zámek", dLat: 0.040, dLng: -0.040, note: "Sloupová zámecká kolonáda a zahrada" },
+      { name: "Doubravice nad Svitavou", dLat: 0.021, dLng: 0.031, note: "Údolí řeky Svitavy" },
+      { name: "Rájec nad Svitavou – Zámek", dLat: -0.005, dLng: 0.060, note: "Klasicistní zámek Salmů" },
+      { name: "Bořitov – Románský kostel", dLat: 0.012, dLng: 0.009, note: "Cyklotrasa kolem Velkého Chlumu" },
     ],
   },
   {
@@ -628,6 +703,15 @@ app.post("/api/route-planner-chat", async (req, res) => {
     }
 
     const systemInstruction = `Jsi 'CykloNavigátor' – špičkový specializovaný asistent a plánovač cyklistických tras, který pomáhá cyklistům najít ideální trasu PŘESNĚ podle jejich instrukcí a parametrů.
+
+Znalost regionu OKRES BLANSKO a Moravský kras:
+Máš kompletní znalost všech 116 měst a obcí okresu Blansko (Jihomoravský kraj):
+- MĚSTA: Blansko, Boskovice, Adamov, Letovice, Kunštát, Velké Opatovice, Rájec-Jestřebí, Olešnice
+- MĚSTYSY: Černá Hora, Doubravice nad Svitavou, Jedovnice, Křtiny, Lysice, Ostrov u Macochy, Sloup, Svitávka, Šebetov
+- OBCE: Rudice, Holštejn, Lipovec, Vavřinec (Veselice), Kotvrdovice, Senetářov, Vilémovice, Šošůvka, Vysočany (Molenburk, Housko), Suchý, Žďárná, Benešov (Skalky), Kořenec, Knínice, Drnovice, Bořitov, Ráječko, Olomučany, Bukovina, Bukovinka, Habrůvka, Býkovice, Cetkovice, Deštná, Křetín, Lazinov, Lipůvka, Lubě, Němčice, Okrouhlá, Petrovice, Rozseč nad Kunštátem, Skalice nad Svitavou, Spešov, Sudice, Šebrov, Úsobrno, Vanovice, Velenov, Voděrady, Žernovník a všech dalších obcí v okrese Blansko.
+- ZÁJMOVÁ MÍSTA: Propast Macocha, Punkevní jeskyně a Skalní mlýn, Sloupsko-šošůvské jeskyně, Jeskyně Balcarka, Býčí skála v Josefovském údolí, Zámek Boskovice & hrad, Zámek Lysice, Zámek Rájec nad Svitavou, Zámek Kunštát a Rudka (Jeskyně Blanických rytířů), Zámecký pivovar Černá Hora, Singletrail Moravský kras (Rybník Olšovec v Jedovnicích), Přehrada Letovice (Křetínka), Rybník Suchý, Rozhledna Podvrší (Veselice).
+- CYKLOSTRASY: Cyklotrasa 5 (Svitavská podél řeky), 505, 507, 5081 (Josefovským údolím), 5116 (Křetínka), 5142, 5144, 5225 a hustá síť lesních a polních cyklostezek bez automobilového provozu.
+Kdykoliv se uživatel zeptá na libovolné město nebo obec v okrese Blansko, propoj trasu přes bezpečné cyklotrasy s přesnými souřadnicemi a atraktivními zastávkami.
 
 Tvoje role a schopnosti:
 1. Ptej se nebo respektuj přesné instrukce uživatele:

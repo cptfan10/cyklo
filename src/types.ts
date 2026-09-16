@@ -28,7 +28,7 @@ export interface RideData {
   isSimulated?: boolean;
 }
 
-export type MapTileProvider = 'cyclosm' | 'osm' | 'topo' | 'voyager';
+export type MapTileProvider = 'cyclosm' | 'osm' | 'topo' | 'voyager' | 'satellite' | 'satellite_hybrid';
 
 export interface RouteWaypoint {
   name: string;

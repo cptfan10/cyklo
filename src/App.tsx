@@ -4,36 +4,37 @@ import { LiveRideHUD } from './components/LiveRideHUD';
 import { RideAnalysisModal } from './components/RideAnalysisModal';
 import { AiCoachDrawer } from './components/AiCoachDrawer';
 import { RideHistory } from './components/RideHistory';
-import { RoutePlannerAssistant } from './components/RoutePlannerAssistant';
+import { RoutePlannerModal } from './components/RoutePlannerModal';
 import { HandlebarCockpitModal } from './components/HandlebarCockpitModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { GalaxyS10HelperModal } from './components/GalaxyS10HelperModal';
 import { useRideRecorder } from './hooks/useRideRecorder';
 import { useWakeLock } from './hooks/useWakeLock';
 import { RideData, MapTileProvider, GpsPoint, PlannedRoute } from './types';
-import { INITIAL_PRESET_RIDES } from './utils/geoUtils';
-import { Bike, Sparkles, History, Compass, Layers, Info, Map as MapIcon, Route, Smartphone } from 'lucide-react';
+import { Bike, Sparkles, History, Compass } from 'lucide-react';
 
 const STORAGE_KEY_RIDES = 'cyklo_asistent_rides_v1';
 
 export default function App() {
   const recorder = useRideRecorder();
 
-  // Saved rides in local storage with preset sample
-  const [rides, setRides] = useState<RideData[]>(() => {
-    try {
-      const saved = localStorage.getItem(STORAGE_KEY_RIDES);
-      if (saved) {
-        return JSON.parse(saved);
-      }
-    } catch (e) {
-      console.warn('Failed to load rides from localStorage:', e);
-    }
-    return INITIAL_PRESET_RIDES;
-  });
+  // Saved rides in session state: starts completely empty on every startup ("A ať to je při každém spuštění prázdné")
+  const [rides, setRides] = useState<RideData[]>([]);
 
-  // Active view: 'live' | 'planner' | 'history'
-  const [activeTab, setActiveTab] = useState<'live' | 'planner' | 'history'>('live');
+  // Clear storage on startup so the app is always 100% empty on every launch/refresh
+  useEffect(() => {
+    try {
+      localStorage.removeItem(STORAGE_KEY_RIDES);
+    } catch (e) {
+      console.warn('Storage reset on start:', e);
+    }
+  }, []);
+
+  // Active view: 'live' | 'history' (Route Planner assistant is now in its own separate window)
+  const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
+
+  // Separate Window state for Route Planner Assistant
+  const [isPlannerModalOpen, setIsPlannerModalOpen] = useState<boolean>(false);
 
   // Selected historical ride to inspect on map
   const [selectedRide, setSelectedRide] = useState<RideData | null>(null);
@@ -78,6 +79,7 @@ export default function App() {
     setPlannedRoute(route);
     setSelectedRide(null);
     setActiveTab('live');
+    setIsPlannerModalOpen(false);
     recorder.startRide(true); // Start in active simulation/gps mode
   };
 
@@ -101,22 +103,23 @@ export default function App() {
     }
   };
 
-  // When user selects a route from the Route Planner chat or catalog
-  const handleSelectRouteFromPlanner = (route: PlannedRoute, switchView = false) => {
-    setPlannedRoute(route);
-    // Only switch to map view on mobile if user explicitly clicked "Zobrazit na mapě"
-    if (switchView && window.innerWidth < 768) {
-      setActiveTab('live');
-    }
+  const handleClearAllRides = () => {
+    setRides([]);
+    setSelectedRide(null);
   };
 
-  // Active points to show on the map
+  // When user selects a route from the Route Planner window or catalog
+  const handleSelectRouteFromPlanner = (route: PlannedRoute) => {
+    setPlannedRoute(route);
+  };
+
+  // Active points to show on the map (starts completely empty on every startup)
   const displayPoints: GpsPoint[] =
     recorder.status !== 'idle'
       ? recorder.points
       : selectedRide
       ? selectedRide.points
-      : rides[0]?.points || [];
+      : [];
 
   const currentActiveLocation =
     recorder.status !== 'idle' && recorder.points.length > 0
@@ -151,7 +154,7 @@ export default function App() {
 
         {/* Navigation Tabs */}
         <div className="flex items-center gap-2">
-          <div className="bg-stone-950/80 p-1 rounded-xl border border-stone-800 flex items-center">
+          <div className="bg-stone-950/80 p-1 rounded-xl border border-stone-800 flex items-center gap-1">
             {/* Live Map Tab */}
             <button
               id="tab-live-map"
@@ -167,20 +170,17 @@ export default function App() {
               <span>Živá mapa</span>
             </button>
 
-            {/* AI Route Planner Tab */}
+            {/* Separate Window Route Planner Launcher Button */}
             <button
-              id="tab-route-planner"
+              id="btn-open-planner-window"
               type="button"
-              onClick={() => setActiveTab('planner')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
-                activeTab === 'planner'
-                  ? 'bg-cyan-500 text-stone-950 shadow-sm font-bold'
-                  : 'text-stone-400 hover:text-stone-200'
-              }`}
+              onClick={() => setIsPlannerModalOpen(true)}
+              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 bg-cyan-500/15 text-cyan-300 hover:bg-cyan-500/25 border border-cyan-500/35 shadow-sm"
+              title="Otevřít asistenta plánování tras v samostatném okně"
             >
-              <Route className="w-3.5 h-3.5" />
-              <span>Plánovač tras</span>
-              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400"></span>
+              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
+              <span className="font-bold">Plánovač tras</span>
+              <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
             </button>
 
             {/* History Tab */}
@@ -223,8 +223,6 @@ export default function App() {
           className={`relative h-full transition-all duration-200 ${
             activeTab === 'live'
               ? 'w-full'
-              : activeTab === 'planner'
-              ? 'hidden md:block md:w-1/2 lg:w-3/5'
               : 'hidden md:block md:w-1/2'
           }`}
         >
@@ -242,6 +240,23 @@ export default function App() {
             onTileProviderChange={setTileProvider}
             className="w-full h-full"
           />
+
+          {/* Quick launcher button on map when idle and no route is planned */}
+          {!plannedRoute && recorder.status === 'idle' && !selectedRide && (
+            <div className="absolute top-4 left-4 z-[400]">
+              <button
+                id="btn-map-quick-planner"
+                type="button"
+                onClick={() => setIsPlannerModalOpen(true)}
+                className="px-3.5 py-2.5 rounded-2xl bg-stone-900/95 hover:bg-stone-800 text-stone-100 border border-cyan-500/50 shadow-2xl backdrop-blur-md text-xs font-semibold flex items-center gap-2 transition-all cursor-pointer group hover:border-cyan-400"
+              >
+                <div className="w-5 h-5 rounded-lg bg-cyan-500/20 text-cyan-300 flex items-center justify-center">
+                  <Sparkles className="w-3.5 h-3.5 fill-cyan-400 text-cyan-400 group-hover:rotate-12 transition-transform" />
+                </div>
+                <span>Plánovat trasu (AI asistent v okně)</span>
+              </button>
+            </div>
+          )}
 
           {/* If viewing historical track badge on map */}
           {selectedRide && recorder.status === 'idle' && (
@@ -264,34 +279,6 @@ export default function App() {
           )}
         </div>
 
-        {/* View: AI Route Planner Assistant */}
-        {activeTab === 'planner' && (
-          <div className="w-full md:w-1/2 lg:w-2/5 h-full bg-stone-950 border-l border-stone-800 z-20 flex flex-col relative">
-            <RoutePlannerAssistant
-              currentLocation={currentActiveLocation}
-              onSelectRouteOnMap={handleSelectRouteFromPlanner}
-              onStartRideWithRoute={handleStartRideWithRoute}
-              activePlannedRoute={plannedRoute}
-              activePlannedRouteId={plannedRoute?.id}
-              onHoverRouteDistance={setHoveredRouteDistance}
-            />
-
-            {/* Mobile quick switch button to see the map if a route is selected */}
-            {plannedRoute && (
-              <div className="md:hidden absolute bottom-24 right-4 z-30">
-                <button
-                  type="button"
-                  onClick={() => setActiveTab('live')}
-                  className="px-3.5 py-2.5 rounded-2xl bg-cyan-500 text-stone-950 font-bold text-xs shadow-2xl flex items-center gap-2 border border-cyan-300 animate-bounce"
-                >
-                  <MapIcon className="w-4 h-4" />
-                  <span>Zobrazit trasu na mapě</span>
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-
         {/* View: History List */}
         {activeTab === 'history' && (
           <div className="w-full md:w-1/2 h-full bg-stone-950/95 border-l border-stone-800 p-4 sm:p-6 overflow-y-auto z-20">
@@ -306,6 +293,7 @@ export default function App() {
               }}
               onOpenAnalysis={(r) => setAnalysisModalRide(r)}
               onDeleteRide={handleDeleteRide}
+              onClearAll={handleClearAllRides}
             />
           </div>
         )}
@@ -376,6 +364,17 @@ export default function App() {
       />
 
       {/* Modals and Drawers */}
+      <RoutePlannerModal
+        isOpen={isPlannerModalOpen}
+        onClose={() => setIsPlannerModalOpen(false)}
+        currentLocation={currentActiveLocation}
+        onSelectRouteOnMap={handleSelectRouteFromPlanner}
+        onStartRideWithRoute={handleStartRideWithRoute}
+        activePlannedRoute={plannedRoute}
+        activePlannedRouteId={plannedRoute?.id}
+        onHoverRouteDistance={setHoveredRouteDistance}
+      />
+
       {analysisModalRide && (
         <RideAnalysisModal
           ride={analysisModalRide}

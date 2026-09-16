@@ -9,6 +9,7 @@ interface RideHistoryProps {
   onSelectRide: (ride: RideData) => void;
   onOpenAnalysis: (ride: RideData) => void;
   onDeleteRide: (rideId: string) => void;
+  onClearAll?: () => void;
 }
 
 export const RideHistory: React.FC<RideHistoryProps> = ({
@@ -16,7 +17,8 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
   selectedRideId,
   onSelectRide,
   onOpenAnalysis,
-  onDeleteRide
+  onDeleteRide,
+  onClearAll,
 }) => {
   const totalKm = rides.reduce((acc, r) => acc + (r.distanceKm || 0), 0);
   const totalClimb = rides.reduce((acc, r) => acc + (r.elevationGainM || 0), 0);
@@ -60,7 +62,18 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
       <div className="space-y-2.5">
         <div className="flex items-center justify-between text-xs text-stone-400 px-1">
           <span className="font-semibold uppercase tracking-wider">Zaznamenané trasy ({rides.length})</span>
-          <span>Klikněte na trasu pro zobrazení na mapě</span>
+          <div className="flex items-center gap-2">
+            {rides.length > 0 && onClearAll && (
+              <button
+                type="button"
+                onClick={onClearAll}
+                className="text-stone-400 hover:text-rose-400 text-[11px] underline cursor-pointer"
+              >
+                Vymazat historii
+              </button>
+            )}
+            <span>Klikněte na trasu pro zobrazení na mapě</span>
+          </div>
         </div>
 
         {rides.length === 0 ? (
