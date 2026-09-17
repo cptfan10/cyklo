@@ -77,3 +77,26 @@ export interface MapLayerConfig {
   attribution: string;
   maxZoom: number;
 }
+
+// Display, AMOLED & Glove Customization Settings
+export type DisplayContrastMode = 'amoled-pure-black' | 'high-contrast-sun' | 'slate-glass' | 'oled-night';
+export type DisplayTypography = 'dot-matrix' | 'sports-mono' | 'bold-sans' | 'bernard-mt';
+export type UiFontTheme = 'default' | 'bernard-mt';
+export type TextScale = 'standard' | 'large' | 'extra-large';
+export type TouchTargetSize = 'standard-44' | 'glove-50' | 'heavy-glove-60';
+export type MetricColorTheme = 'emerald' | 'cyan' | 'amber' | 'white';
+export type SpeedometerSize = 'standard' | 'giant';
+export type DisplayPresetId = 'galaxy-s10' | 'outdoor-sun' | 'gloves-winter' | 'digital-led' | 'night-ride' | 'slate-glass' | 'bernard-classic' | 'custom';
+
+export interface DisplaySettings {
+  contrastMode: DisplayContrastMode;
+  typography: DisplayTypography;
+  uiFontTheme: UiFontTheme;
+  textScale: TextScale;
+  touchTargetSize: TouchTargetSize;
+  metricColorTheme: MetricColorTheme;
+  speedometerSize: SpeedometerSize;
+  hapticFeedback: boolean;
+  highContrastBorders: boolean;
+  activePreset: DisplayPresetId;
+}

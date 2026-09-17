@@ -26,7 +26,30 @@ function getGeminiClient(): GoogleGenAI | null {
   });
 }
 
-const CANDIDATE_MODELS = ["gemini-3.8-flash", "gemini-flash-latest", "gemini-3.1-flash-lite"];
+const CANDIDATE_MODELS = [
+  "gemini-3.1-flash-lite",
+  "gemini-3.8-flash",
+  "gemini-flash-latest",
+];
+
+// In-memory cooldown tracking for models experiencing 429 (quota) or 503 (high demand)
+const modelCooldowns = new Map<string, number>();
+
+function getAvailableModels(): string[] {
+  const now = Date.now();
+  const available = CANDIDATE_MODELS.filter((m) => {
+    const cooldownUntil = modelCooldowns.get(m) || 0;
+    return now >= cooldownUntil;
+  });
+  return available.length > 0 ? available : [...CANDIDATE_MODELS];
+}
+
+function markModelCooldown(model: string, status: number | string) {
+  const now = Date.now();
+  const is429 = String(status) === "429" || String(status).includes("429");
+  const durationMs = is429 ? 5 * 60 * 1000 : 45 * 1000;
+  modelCooldowns.set(model, now + durationMs);
+}
 
 function sanitizeHistory(history: any[], currentMessage: string): any[] {
   if (!Array.isArray(history)) return [];
@@ -64,27 +87,24 @@ async function generateContentWithFallback(
   ai: GoogleGenAI,
   params: { contents: any; config?: any }
 ): Promise<{ text: string; model: string }> {
+  const models = getAvailableModels();
   let lastError: any = null;
-  for (const model of CANDIDATE_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const response = await ai.models.generateContent({
-          ...params,
-          model,
-        });
-        if (response && response.text) {
-          return { text: response.text, model };
-        }
-      } catch (err: any) {
-        lastError = err;
-        const status = err?.status || err?.statusCode || "";
-        console.warn(`Model ${model} (attempt ${attempt + 1}) failed (${status || err?.message || "error"}), checking next...`);
-        if (attempt === 0 && (status === 503 || status === 429)) {
-          await new Promise((r) => setTimeout(r, 500));
-          continue;
-        }
-        break;
+
+  for (const model of models) {
+    try {
+      const response = await ai.models.generateContent({
+        ...params,
+        model,
+      });
+      if (response && response.text) {
+        modelCooldowns.delete(model);
+        return { text: response.text, model };
       }
+    } catch (err: any) {
+      lastError = err;
+      const status = err?.status || err?.statusCode || 0;
+      markModelCooldown(model, status);
+      // Seamlessly advance to next candidate model
     }
   }
   throw lastError || new Error("All Gemini models unavailable");
@@ -99,36 +119,43 @@ async function sendChatWithFallback(
   }
 ): Promise<{ text: string; model: string }> {
   const cleanHistory = sanitizeHistory(options.history, options.message);
+  const models = getAvailableModels();
   let lastError: any = null;
 
-  for (const model of CANDIDATE_MODELS) {
-    for (let attempt = 0; attempt < 2; attempt++) {
-      try {
-        const chat = ai.chats.create({
-          model,
-          config: {
-            systemInstruction: options.systemInstruction,
-          },
-          history: cleanHistory,
-        });
-        const response = await chat.sendMessage({
-          message: options.message,
-        });
-        if (response && response.text) {
-          return { text: response.text, model };
-        }
-      } catch (err: any) {
-        lastError = err;
-        const status = err?.status || err?.statusCode || "";
-        console.warn(`Chat model ${model} (attempt ${attempt + 1}) failed (${status || err?.message || "error"})...`);
-        if (attempt === 0 && (status === 503 || status === 429)) {
-          await new Promise((r) => setTimeout(r, 500));
-          continue;
-        }
-        break;
+  for (const model of models) {
+    try {
+      const chat = ai.chats.create({
+        model,
+        config: {
+          systemInstruction: options.systemInstruction,
+        },
+        history: cleanHistory,
+      });
+      const response = await chat.sendMessage({
+        message: options.message,
+      });
+      if (response && response.text) {
+        modelCooldowns.delete(model);
+        return { text: response.text, model };
       }
+    } catch (err: any) {
+      lastError = err;
+      const status = err?.status || err?.statusCode || 0;
+      markModelCooldown(model, status);
     }
   }
+
+  // Direct prompt fallback if chat history structure had issues
+  try {
+    const prompt = `${options.systemInstruction ? `[Systémové instrukce]: ${options.systemInstruction}\n\n` : ""}${options.message}`;
+    const directResult = await generateContentWithFallback(ai, { contents: prompt });
+    if (directResult && directResult.text) {
+      return directResult;
+    }
+  } catch (_e) {
+    // Handled below
+  }
+
   throw lastError || new Error("All Gemini chat models unavailable");
 }
 
@@ -275,8 +302,8 @@ Buď přátelský, odborný a povzbudivý.`;
       });
       analysisText = result.text;
       sourceModel = result.model;
-    } catch (modelErr: any) {
-      console.warn("Gemini model error during ride analysis, falling back to rule-engine:", modelErr?.message || modelErr);
+    } catch (_modelErr: any) {
+      console.log("Using rule-engine cycling analysis");
       const distance = Number(ride.distanceKm || 0);
       const durationMin = Math.round(Number(ride.durationSeconds || 0) / 60);
       const avgSpeed = Number(ride.avgSpeedKmh || 0);
@@ -364,8 +391,8 @@ ${
     });
 
     res.json({ reply: result.text || "Omlouvám se, nepodařilo se vygenerovat odpověď.", model: result.model });
-  } catch (error: any) {
-    console.warn("Gemini unavailable in coach chat (e.g. 503 high demand), using coach engine fallback:", error?.message || error);
+  } catch (_err: any) {
+    console.log("Serving coach engine fallback response");
     // Return high quality cycling coach reply with 200 OK so that client doesn't see "Chyba komunikace se serverem"
     res.json({
       reply: generateFallbackCoachResponse(message, currentRideContext),
@@ -768,8 +795,8 @@ ${userPreferences ? `Uživatelské preference: ${JSON.stringify(userPreferences)
       reply: result.text || "Omlouvám se, nepodařilo se vygenerovat trasu.",
       model: result.model,
     });
-  } catch (error: any) {
-    console.error("Error in route planner chat, using intelligent geo engine fallback:", error?.message || error);
+  } catch (_err: any) {
+    console.log("Serving intelligent geo engine fallback route");
 
     const fallbackRoute = generateSmartRouteFallback(message, userPreferences, currentLocation);
 

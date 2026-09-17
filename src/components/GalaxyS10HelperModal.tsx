@@ -29,7 +29,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
                 </div>
                 <div>
                   <h3 className="text-sm sm:text-base font-bold text-white">Samsung Galaxy S10+ Režim</h3>
-                  <p className="text-[11px] text-stone-300">Nastavení pro jízdu na kole na řídítkách</p>
+                  <p className="text-xs text-stone-300">Nastavení pro jízdu na kole na řídítkách</p>
                 </div>
               </div>
               <button
@@ -41,7 +41,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
               </button>
             </div>
 
-            <div className="my-4 space-y-3 text-xs text-stone-200 max-h-[60vh] overflow-y-auto pr-1">
+            <div className="my-4 space-y-3 text-xs sm:text-sm text-stone-200 max-h-[60vh] overflow-y-auto pr-1">
               <div className="glass-tile p-3 flex items-start gap-2.5">
                 <Sun className="w-4 h-4 text-amber-400 shrink-0 mt-0.5" />
                 <div>
@@ -77,7 +77,7 @@ export const GalaxyS10HelperModal: React.FC = () => {
                       setIsOpen(false);
                       setShowApkModal(true);
                     }}
-                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-[11px] cursor-pointer"
+                    className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-400 text-stone-950 font-bold text-xs cursor-pointer"
                   >
                     <Download className="w-3.5 h-3.5" />
                     Otevřít průvodce instalací APK

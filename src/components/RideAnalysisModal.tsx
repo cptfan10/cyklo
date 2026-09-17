@@ -225,7 +225,7 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
                 {new Date(ride.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'long', year: 'numeric' })}
               </span>
               {analysisSource && (
-                <span className="text-[10px] px-2 py-0.5 rounded bg-stone-800/80 text-stone-300 border border-white/10">
+                <span className="text-xs px-2.5 py-0.5 rounded-md bg-stone-800/80 text-stone-200 font-semibold border border-white/10">
                   {analysisSource.includes('gemini') ? 'Gemini 3 AI' : 'Cyklo AI'}
                 </span>
               )}
@@ -254,28 +254,28 @@ ${elev > 250 ? `- Převýšení ${elev} m představovalo poctivou zátěž pro s
           <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Gauge className="w-4 h-4 text-emerald-400 shrink-0" />
             <div>
-              <div className="text-[11px] text-stone-400">Vzdálenost</div>
+              <div className="text-xs font-semibold text-stone-300">Vzdálenost</div>
               <div className="font-bold font-mono text-white">{ride.distanceKm.toFixed(2)} km</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Clock className="w-4 h-4 text-amber-400 shrink-0" />
             <div>
-              <div className="text-[11px] text-stone-400">Čas jízdy</div>
+              <div className="text-xs font-semibold text-stone-300">Čas jízdy</div>
               <div className="font-bold font-mono text-white">{formatDuration(ride.durationSeconds)}</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Mountain className="w-4 h-4 text-cyan-400 shrink-0" />
             <div>
-              <div className="text-[11px] text-stone-400">Převýšení</div>
+              <div className="text-xs font-semibold text-stone-300">Převýšení</div>
               <div className="font-bold font-mono text-white">+{ride.elevationGainM} m</div>
             </div>
           </div>
           <div className="flex items-center gap-2.5 p-2.5 glass-tile !rounded-xl">
             <Flame className="w-4 h-4 text-orange-400 shrink-0" />
             <div>
-              <div className="text-[11px] text-stone-400">Výdej kalorií</div>
+              <div className="text-xs font-semibold text-stone-300">Výdej kalorií</div>
               <div className="font-bold font-mono text-white">{ride.caloriesBurned} kcal</div>
             </div>
           </div>

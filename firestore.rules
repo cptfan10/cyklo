@@ -1,0 +1,92 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Default Deny Catch-All
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Helper functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['id', 'email']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.id == request.auth.uid &&
+             data.email is string && data.email.size() <= 256 &&
+             (!('displayName' in data) || (data.displayName is string && data.displayName.size() <= 100)) &&
+             (!('photoURL' in data) || (data.photoURL is string && data.photoURL.size() <= 1000));
+    }
+
+    function isValidRide(data) {
+      return data.keys().hasAll(['id', 'userId', 'name', 'distanceKm', 'durationSeconds', 'avgSpeedKmh', 'elevationGainM']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 120 &&
+             data.distanceKm is number && data.distanceKm >= 0 &&
+             data.durationSeconds is number && data.durationSeconds >= 0 &&
+             data.avgSpeedKmh is number && data.avgSpeedKmh >= 0 &&
+             data.elevationGainM is number && data.elevationGainM >= 0 &&
+             (!('maxSpeedKmh' in data) || (data.maxSpeedKmh is number && data.maxSpeedKmh >= 0)) &&
+             (!('caloriesBurned' in data) || (data.caloriesBurned is number && data.caloriesBurned >= 0)) &&
+             (!('bikeType' in data) || (data.bikeType is string && data.bikeType.size() <= 60)) &&
+             (!('cyclistNotes' in data) || (data.cyclistNotes is string && data.cyclistNotes.size() <= 1000)) &&
+             (!('aiAnalysis' in data) || (data.aiAnalysis is string && data.aiAnalysis.size() <= 5000)) &&
+             (!('points' in data) || (data.points is list && data.points.size() <= 10000));
+    }
+
+    function isValidSavedRoute(data) {
+      return data.keys().hasAll(['id', 'userId', 'routeName', 'distanceKm', 'elevationGainM']) &&
+             data.id is string && data.id.size() <= 128 &&
+             data.userId is string && data.userId == request.auth.uid &&
+             data.routeName is string && data.routeName.size() > 0 && data.routeName.size() <= 120 &&
+             data.distanceKm is number && data.distanceKm >= 0 &&
+             data.elevationGainM is number && data.elevationGainM >= 0 &&
+             (!('bikeType' in data) || (data.bikeType is string && data.bikeType.size() <= 60)) &&
+             (!('difficulty' in data) || (data.difficulty is string && data.difficulty.size() <= 50)) &&
+             (!('description' in data) || (data.description is string && data.description.size() <= 2000)) &&
+             (!('coordinates' in data) || (data.coordinates is list && data.coordinates.size() <= 5000));
+    }
+
+    // User Profile Documents
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+      allow list: if false; // Disallow querying all users
+      allow create: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidUser(incoming());
+      allow update: if isSignedIn() && isValidId(userId) && request.auth.uid == userId && isValidUser(incoming()) && incoming().id == existing().id;
+      allow delete: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+
+      // Recorded Rides Subcollection
+      match /rides/{rideId} {
+        allow get, delete: if isSignedIn() && isValidId(userId) && isValidId(rideId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(rideId) && request.auth.uid == userId && isValidRide(incoming()) && incoming().userId == userId;
+        allow update: if isSignedIn() && isValidId(userId) && isValidId(rideId) && request.auth.uid == userId && isValidRide(incoming()) && incoming().userId == existing().userId;
+      }
+
+      // Saved Planned Routes Subcollection
+      match /savedRoutes/{routeId} {
+        allow get, delete: if isSignedIn() && isValidId(userId) && isValidId(routeId) && request.auth.uid == userId;
+        allow list: if isSignedIn() && isValidId(userId) && request.auth.uid == userId;
+        allow create: if isSignedIn() && isValidId(userId) && isValidId(routeId) && request.auth.uid == userId && isValidSavedRoute(incoming()) && incoming().userId == userId;
+        allow update: if isSignedIn() && isValidId(userId) && isValidId(routeId) && request.auth.uid == userId && isValidSavedRoute(incoming()) && incoming().userId == existing().userId;
+      }
+    }
+  }
+}

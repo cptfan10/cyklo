@@ -8,34 +8,63 @@ import { RoutePlannerModal } from './components/RoutePlannerModal';
 import { HandlebarCockpitModal } from './components/HandlebarCockpitModal';
 import { PWAInstallButton } from './components/PWAInstallButton';
 import { GalaxyS10HelperModal } from './components/GalaxyS10HelperModal';
+import { DisplaySettingsModal } from './components/DisplaySettingsModal';
+import { FirebaseAuthStatus } from './components/FirebaseAuthStatus';
 import { useRideRecorder } from './hooks/useRideRecorder';
 import { useWakeLock } from './hooks/useWakeLock';
+import { useDisplaySettings } from './hooks/useDisplaySettings';
 import { RideData, MapTileProvider, GpsPoint, PlannedRoute } from './types';
-import { Bike, Sparkles, History, Compass } from 'lucide-react';
+import { Bike, Sparkles, History, Compass, Sliders, Type, Maximize2 } from 'lucide-react';
+import { User } from 'firebase/auth';
+import { saveRideToCloud, deleteRideFromCloud, subscribeToUserRides } from './firebase';
 
 const STORAGE_KEY_RIDES = 'cyklo_asistent_rides_v1';
 
 export default function App() {
   const recorder = useRideRecorder();
+  const display = useDisplaySettings();
+
+  // Firebase Authenticated User
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
 
   // Saved rides in session state: starts completely empty on every startup ("A ať to je při každém spuštění prázdné")
   const [rides, setRides] = useState<RideData[]>([]);
 
-  // Clear storage on startup so the app is always 100% empty on every launch/refresh ("A ať to je při každém spuštění prázdné")
+  // Clear rides storage on startup so the app is always 100% empty on fresh unauthenticated launches, while preserving custom display settings
   useEffect(() => {
     try {
-      localStorage.clear();
+      localStorage.removeItem(STORAGE_KEY_RIDES);
       sessionStorage.clear();
     } catch (e) {
       console.warn('Storage reset on start:', e);
     }
   }, []);
 
+  // Real-time Firestore sync when user is signed in to Firebase
+  useEffect(() => {
+    if (!currentUser) return;
+
+    const unsubscribe = subscribeToUserRides(
+      currentUser.uid,
+      (cloudRides) => {
+        setRides(cloudRides);
+      },
+      (err) => {
+        console.warn('Firestore subscription notice:', err);
+      }
+    );
+
+    return () => unsubscribe();
+  }, [currentUser]);
+
   // Active view: 'live' | 'history' (Route Planner assistant is now in its own separate window)
   const [activeTab, setActiveTab] = useState<'live' | 'history'>('live');
 
   // Separate Window state for Route Planner Assistant
   const [isPlannerModalOpen, setIsPlannerModalOpen] = useState<boolean>(false);
+
+  // Modal state for Custom Display & AMOLED & Glove Controls
+  const [isDisplaySettingsOpen, setIsDisplaySettingsOpen] = useState<boolean>(false);
 
   // Selected historical ride to inspect on map
   const [selectedRide, setSelectedRide] = useState<RideData | null>(null);
@@ -95,12 +124,26 @@ export default function App() {
     setRides((prev) => [savedRide, ...prev.filter((r) => r.id !== savedRide.id)]);
     setSelectedRide(savedRide);
     recorder.resetRide();
+
+    // If user is authenticated with Firebase, synchronize to Firestore
+    if (currentUser) {
+      saveRideToCloud(currentUser.uid, savedRide).catch((err) => {
+        console.error('Failed to sync ride to Firestore:', err);
+      });
+    }
   };
 
   const handleDeleteRide = (rideId: string) => {
     setRides((prev) => prev.filter((r) => r.id !== rideId));
     if (selectedRide?.id === rideId) {
       setSelectedRide(null);
+    }
+
+    // If user is authenticated with Firebase, delete from Firestore
+    if (currentUser) {
+      deleteRideFromCloud(currentUser.uid, rideId).catch((err) => {
+        console.error('Failed to delete ride from Firestore:', err);
+      });
     }
   };
 
@@ -130,7 +173,9 @@ export default function App() {
       : null;
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-stone-950 text-stone-100 font-sans">
+    <div className={`flex flex-col h-screen w-screen overflow-hidden bg-stone-950 text-stone-100 ${
+      display.settings.uiFontTheme === 'bernard-mt' ? 'theme-font-bernard-mt' : 'font-sans'
+    } ${display.getTextScaleClass()}`}>
       {/* Top Navigation Bar with Galaxy S10+ notch / safe-area padding */}
       <header className="h-16 px-3 sm:px-6 glass-panel !rounded-none !border-x-0 !border-t-0 flex items-center justify-between z-40 shrink-0 [padding-top:max(0.25rem,env(safe-area-inset-top))]">
         <div className="flex items-center gap-2 sm:gap-3 min-w-0">
@@ -138,16 +183,16 @@ export default function App() {
             <Bike className="w-5 h-5 sm:w-6 sm:h-6 stroke-[2.2]" />
           </div>
           <div className="min-w-0">
-            <h1 className="text-sm sm:text-lg font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2 truncate">
+            <h1 className="text-sm sm:text-lg font-bold tracking-tight text-white flex items-center gap-1.5 sm:gap-2 truncate app-brand-title">
               <span>Cyklo Asistent</span>
               {recorder.status === 'recording' && (
-                <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[9px] sm:text-[10px] font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
-                  <span className="w-1.5 h-1.5 rounded-full bg-rose-500 mr-1 animate-ping"></span>
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-bold bg-rose-500/20 text-rose-400 border border-rose-500/30 shrink-0">
+                  <span className="w-2 h-2 rounded-full bg-rose-500 mr-1.5 animate-ping"></span>
                   LIVE
                 </span>
               )}
             </h1>
-            <p className="text-[11px] text-stone-400 hidden lg:block truncate">
+            <p className="text-xs text-stone-300 hidden lg:block truncate">
               Záznam trasy na veřejných mapách, AI plánování na míru a sportovní analýza
             </p>
           </div>
@@ -161,13 +206,13 @@ export default function App() {
               id="tab-live-map"
               type="button"
               onClick={() => setActiveTab('live')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 nav-tab-btn ${
                 activeTab === 'live'
-                  ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
+                  ? 'bg-emerald-500 text-stone-950 shadow-sm'
                   : 'text-stone-300 hover:text-white'
               }`}
             >
-              <Compass className="w-3.5 h-3.5" />
+              <Compass className="w-4 h-4" />
               <span>Živá mapa</span>
             </button>
 
@@ -176,11 +221,11 @@ export default function App() {
               id="btn-open-planner-window"
               type="button"
               onClick={() => setIsPlannerModalOpen(true)}
-              className="px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 shadow-sm"
+              className="px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 bg-cyan-500/20 text-cyan-300 hover:bg-cyan-500/30 border border-cyan-500/40 shadow-sm nav-tab-btn"
               title="Otevřít asistenta plánování tras v samostatném okně"
             >
-              <Sparkles className="w-3.5 h-3.5 text-cyan-400" />
-              <span className="font-bold">Plánovač tras</span>
+              <Sparkles className="w-4 h-4 text-cyan-400" />
+              <span>Plánovač tras</span>
               <span className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse"></span>
             </button>
 
@@ -189,13 +234,13 @@ export default function App() {
               id="tab-history"
               type="button"
               onClick={() => setActiveTab('history')}
-              className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all cursor-pointer flex items-center gap-1.5 ${
+              className={`px-3 sm:px-3.5 py-1.5 sm:py-2 rounded-lg text-xs sm:text-sm font-bold transition-all cursor-pointer flex items-center gap-1.5 nav-tab-btn ${
                 activeTab === 'history'
-                  ? 'bg-emerald-500 text-stone-950 shadow-sm font-bold'
+                  ? 'bg-emerald-500 text-stone-950 shadow-sm'
                   : 'text-stone-300 hover:text-white'
               }`}
             >
-              <History className="w-3.5 h-3.5" />
+              <History className="w-4 h-4" />
               <span>Historie ({rides.length})</span>
             </button>
           </div>
@@ -204,12 +249,94 @@ export default function App() {
           <button
             id="btn-open-coach"
             type="button"
-            onClick={() => setIsCoachDrawerOpen(true)}
+            onClick={() => {
+              display.triggerHaptic(20);
+              setIsCoachDrawerOpen(true);
+            }}
             className="px-2.5 sm:px-3.5 py-2 rounded-xl glass-tile-interactive !rounded-xl !border-emerald-500/40 text-emerald-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
           >
             <Sparkles className="w-4 h-4 text-emerald-400" />
             <span className="hidden sm:inline">AI Trenér</span>
           </button>
+
+          {/* Quick Text Size Switcher Button */}
+          <button
+            id="btn-toggle-text-scale-header"
+            type="button"
+            onClick={() => {
+              display.triggerHaptic(30);
+              const nextScale =
+                display.settings.textScale === 'standard'
+                  ? 'large'
+                  : display.settings.textScale === 'large'
+                  ? 'extra-large'
+                  : 'standard';
+              display.updateSettings({ textScale: nextScale });
+            }}
+            className={`px-2.5 sm:px-3.5 py-2 rounded-xl glass-tile-interactive !rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 ${
+              display.settings.textScale === 'extra-large'
+                ? '!border-emerald-400/70 bg-emerald-500/25 text-emerald-300 ring-1 ring-emerald-400/50'
+                : display.settings.textScale === 'large'
+                ? '!border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
+                : '!border-stone-700 text-stone-300 hover:text-white'
+            }`}
+            title="Zvětšit písmena a slova: Přepnout mezi Standardním (100%), Zvětšeným (115%) a Extra velkým textem (130%)"
+          >
+            <Maximize2 className="w-4 h-4 text-emerald-400" />
+            <span className="font-extrabold text-xs sm:text-sm">
+              {display.settings.textScale === 'extra-large'
+                ? 'Text: Extra velký (130%)'
+                : display.settings.textScale === 'large'
+                ? 'Text: Velký (115%)'
+                : 'Text: 100%'}
+            </span>
+          </button>
+
+          {/* Quick Bernard MT Font Toggle Button */}
+          <button
+            id="btn-toggle-font-header"
+            type="button"
+            onClick={() => {
+              display.triggerHaptic(25);
+              const isBernard = display.settings.uiFontTheme === 'bernard-mt' || display.settings.typography === 'bernard-mt';
+              display.updateSettings({
+                typography: isBernard ? 'sports-mono' : 'bernard-mt',
+                uiFontTheme: isBernard ? 'default' : 'bernard-mt',
+              });
+            }}
+            className={`px-2.5 sm:px-3 py-2 rounded-xl glass-tile-interactive !rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0 ${
+              display.settings.uiFontTheme === 'bernard-mt' || display.settings.typography === 'bernard-mt'
+                ? '!border-amber-400/60 bg-amber-500/20 text-amber-300 ring-1 ring-amber-400/40'
+                : '!border-stone-700 text-stone-300 hover:text-white'
+            }`}
+            title="Přepnout styl písma Bernard MT (retro serif) pro tachometr, nadpisy a celou aplikaci"
+          >
+            <Type className="w-4 h-4 text-amber-400" />
+            <span className="hidden lg:inline text-xs sm:text-sm font-bold font-bernard-mt">
+              {display.settings.uiFontTheme === 'bernard-mt' ? 'Bernard MT' : 'Výchozí font'}
+            </span>
+          </button>
+
+          {/* Display & AMOLED Customization Button */}
+          <button
+            id="btn-display-settings-header"
+            type="button"
+            onClick={() => {
+              display.triggerHaptic(20);
+              setIsDisplaySettingsOpen(true);
+            }}
+            className="px-2.5 sm:px-3 py-2 rounded-xl glass-tile-interactive !rounded-xl !border-cyan-500/40 text-cyan-300 text-xs sm:text-sm font-semibold flex items-center gap-1.5 transition-all shadow-md cursor-pointer shrink-0"
+            title="Přizpůsobit kontrast AMOLED, styl písma Bernard MT/LED a velikost ovládacích prvků pro rukavice"
+          >
+            <Sliders className="w-4 h-4 text-cyan-400" />
+            <span className="hidden md:inline">AMOLED & Displej</span>
+            <span className="px-1.5 py-0.2 rounded text-xs font-mono bg-cyan-950/80 border border-cyan-700/50 text-cyan-200">
+              {display.settings.touchTargetSize === 'heavy-glove-60' ? '60px' : display.settings.touchTargetSize === 'glove-50' ? '50px' : '44px'}
+            </span>
+          </button>
+
+          {/* Firebase Cloud Sync Status & Google Auth */}
+          <FirebaseAuthStatus onUserChanged={setCurrentUser} />
 
           {/* Samsung Galaxy S10+ & PWA Install Controls */}
           <GalaxyS10HelperModal />
@@ -318,6 +445,7 @@ export default function App() {
           isScreenLocked={wakeLock.isLocked}
           isWakeLockSupported={wakeLock.isSupported}
           onToggleScreenLock={() => {
+            display.triggerHaptic(20);
             if (wakeLock.isLocked) {
               setKeepScreenOn(false);
               wakeLock.releaseLock();
@@ -326,7 +454,16 @@ export default function App() {
               wakeLock.requestLock();
             }
           }}
-          onOpenCockpit={() => setIsCockpitOpen(true)}
+          onOpenCockpit={() => {
+            display.triggerHaptic(30);
+            setIsCockpitOpen(true);
+          }}
+          onOpenDisplaySettings={() => {
+            display.triggerHaptic(20);
+            setIsDisplaySettingsOpen(true);
+          }}
+          displaySettings={display.settings}
+          triggerHaptic={display.triggerHaptic}
           onStart={handleStartRide}
           onPause={recorder.pauseRide}
           onResume={recorder.resumeRide}
@@ -354,6 +491,7 @@ export default function App() {
         onFinish={handleFinishRide}
         isWakeLocked={wakeLock.isLocked}
         onToggleWakeLock={() => {
+          display.triggerHaptic(20);
           if (wakeLock.isLocked) {
             setKeepScreenOn(false);
             wakeLock.releaseLock();
@@ -362,6 +500,19 @@ export default function App() {
             wakeLock.requestLock();
           }
         }}
+        displaySettings={display.settings}
+        onOpenDisplaySettings={() => setIsDisplaySettingsOpen(true)}
+        onTriggerHaptic={display.triggerHaptic}
+      />
+
+      {/* AMOLED, Dot-Matrix Typography & Glove Touch Target Settings Modal */}
+      <DisplaySettingsModal
+        isOpen={isDisplaySettingsOpen}
+        onClose={() => setIsDisplaySettingsOpen(false)}
+        settings={display.settings}
+        onUpdateSettings={display.updateSettings}
+        onApplyPreset={display.applyPreset}
+        onTriggerHaptic={display.triggerHaptic}
       />
 
       {/* Modals and Drawers */}

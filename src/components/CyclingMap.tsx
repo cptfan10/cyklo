@@ -468,7 +468,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
                 }`}
               >
                 <Mountain className="w-3.5 h-3.5" />
-                <span className="text-[10px]">Profil</span>
+                <span className="text-xs font-semibold">Profil</span>
               </button>
 
               {onClearPlannedRoute && (
@@ -484,13 +484,13 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
             </div>
           </div>
 
-          <div className="text-sm font-semibold text-white truncate">{plannedRoute.routeName}</div>
+          <div className="text-sm sm:text-base font-bold text-white truncate banner-route-title">{plannedRoute.routeName}</div>
 
           <div className="flex items-center justify-between text-xs text-stone-300 mt-1 font-mono">
             <div className="flex items-center gap-2.5">
               <span className="text-cyan-400 font-bold">{plannedRoute.distanceKm} km</span>
               <span className="text-emerald-400 font-bold">+{plannedRoute.elevationGainM} m</span>
-              {plannedRoute.bikeType && <span className="text-stone-400 font-sans text-[11px]">{plannedRoute.bikeType}</span>}
+              {plannedRoute.bikeType && <span className="text-stone-300 font-sans text-xs font-semibold">{plannedRoute.bikeType}</span>}
             </div>
 
             <div className="flex items-center gap-1">
@@ -631,7 +631,7 @@ export const CyclingMap: React.FC<CyclingMapProps> = ({
 
       {/* Bottom Map Badge showing active public map */}
       <div className="absolute bottom-3 left-3 z-[300] pointer-events-none">
-        <div className="px-2.5 py-1 rounded-lg glass-tile !rounded-lg text-[11px] text-stone-300 flex items-center gap-1.5 shadow-md">
+        <div className="px-2.5 py-1 rounded-lg glass-tile !rounded-lg text-xs font-semibold text-stone-200 flex items-center gap-1.5 shadow-md">
           <Compass className="w-3.5 h-3.5 text-emerald-400" />
           <span>{TILE_PROVIDERS[tileProvider].name.split(' (')[0]}</span>
         </div>

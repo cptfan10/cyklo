@@ -1,0 +1,182 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "User Profile",
+      "description": "Public and private profile information for registered cyclists.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Firebase Auth UID matching the document ID.",
+          "maxLength": 128
+        },
+        "email": {
+          "type": "string",
+          "description": "Cyclist email address.",
+          "maxLength": 256
+        },
+        "displayName": {
+          "type": "string",
+          "description": "Cyclist display name.",
+          "maxLength": 100
+        },
+        "photoURL": {
+          "type": "string",
+          "description": "User avatar URL.",
+          "maxLength": 1000
+        },
+        "createdAt": {
+          "type": "string",
+          "description": "Timestamp when the user account was initialized."
+        }
+      },
+      "required": ["id", "email"]
+    },
+    "Ride": {
+      "title": "Cycling Ride",
+      "description": "Tracked cycling session containing distance, GPS track, telemetry, and AI coach analysis.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the ride.",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the ride author.",
+          "maxLength": 128
+        },
+        "name": {
+          "type": "string",
+          "description": "User-assigned title for the ride.",
+          "maxLength": 120
+        },
+        "date": {
+          "type": "string",
+          "description": "ISO timestamp string of ride start."
+        },
+        "distanceKm": {
+          "type": "number",
+          "description": "Total distance traveled in kilometers."
+        },
+        "durationSeconds": {
+          "type": "number",
+          "description": "Total elapsed ride duration in seconds."
+        },
+        "movingTimeSeconds": {
+          "type": "number",
+          "description": "Actual time moving on the bike."
+        },
+        "avgSpeedKmh": {
+          "type": "number",
+          "description": "Average cycling speed in km/h."
+        },
+        "maxSpeedKmh": {
+          "type": "number",
+          "description": "Maximum recorded speed in km/h."
+        },
+        "elevationGainM": {
+          "type": "number",
+          "description": "Cumulative elevation climbed in meters."
+        },
+        "elevationLossM": {
+          "type": "number",
+          "description": "Cumulative descent in meters."
+        },
+        "caloriesBurned": {
+          "type": "number",
+          "description": "Estimated energy expenditure in kilocalories."
+        },
+        "bikeType": {
+          "type": "string",
+          "description": "Bicycle category used (e.g. Gravel, Silniční, MTB).",
+          "maxLength": 60
+        },
+        "cyclistNotes": {
+          "type": "string",
+          "description": "Optional athlete notes or weather comments.",
+          "maxLength": 1000
+        },
+        "aiAnalysis": {
+          "type": "string",
+          "description": "Gemini AI generated performance breakdown and recovery guidance.",
+          "maxLength": 5000
+        },
+        "isSimulated": {
+          "type": "boolean",
+          "description": "Whether the ride track was a test simulation."
+        },
+        "points": {
+          "type": "array",
+          "description": "GPS trace coordinate points."
+        }
+      },
+      "required": ["id", "userId", "name", "distanceKm", "durationSeconds", "avgSpeedKmh", "elevationGainM"]
+    },
+    "SavedRoute": {
+      "title": "Saved Planned Route",
+      "description": "Planned cycling itinerary saved for offline navigation or future riding.",
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Unique identifier of the planned route.",
+          "maxLength": 128
+        },
+        "userId": {
+          "type": "string",
+          "description": "Firebase Auth UID of the route creator.",
+          "maxLength": 128
+        },
+        "routeName": {
+          "type": "string",
+          "description": "Name of the planned cycling itinerary.",
+          "maxLength": 120
+        },
+        "distanceKm": {
+          "type": "number",
+          "description": "Planned distance in km."
+        },
+        "elevationGainM": {
+          "type": "number",
+          "description": "Estimated climb in meters."
+        },
+        "bikeType": {
+          "type": "string",
+          "description": "Recommended bike type.",
+          "maxLength": 60
+        },
+        "difficulty": {
+          "type": "string",
+          "description": "Route difficulty tier.",
+          "maxLength": 50
+        },
+        "description": {
+          "type": "string",
+          "description": "Route overview and surface notes.",
+          "maxLength": 2000
+        },
+        "coordinates": {
+          "type": "array",
+          "description": "Lat/Lng waypoints making up the route line."
+        }
+      },
+      "required": ["id", "userId", "routeName", "distanceKm", "elevationGainM"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": "UserProfile",
+      "description": "User profile document keyed by auth UID."
+    },
+    "/users/{userId}/rides/{rideId}": {
+      "schema": "Ride",
+      "description": "User recorded rides subcollection."
+    },
+    "/users/{userId}/savedRoutes/{routeId}": {
+      "schema": "SavedRoute",
+      "description": "User saved routes subcollection."
+    }
+  }
+}

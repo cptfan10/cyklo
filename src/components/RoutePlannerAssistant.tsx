@@ -601,11 +601,11 @@ ${JSON.stringify(fallbackRoute, null, 2)}
           <div>
             <h2 className="text-sm font-bold text-white flex items-center gap-2">
               Plánovač tras
-              <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 text-[10px] font-mono border border-cyan-800/40">
+              <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 text-xs font-mono border border-cyan-800/40">
                 AI + OSM
               </span>
             </h2>
-            <p className="text-[11px] text-stone-400 hidden sm:block">
+            <p className="text-xs text-stone-300 hidden sm:block">
               Inteligentní vyhledání a generování cyklotras na veřejných mapách
             </p>
           </div>
@@ -663,7 +663,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
         >
           <Building className="w-3.5 h-3.5 text-amber-400 group-hover:text-amber-300" />
           <span>Okres Blansko</span>
-          <span className={`px-1.5 py-0.2 rounded-full text-[10px] font-bold ${
+          <span className={`px-2 py-0.5 rounded-full text-xs font-bold ${
             activeTab === 'blansko' ? 'bg-stone-950/40 text-stone-950' : 'bg-amber-500/20 text-amber-300'
           }`}>
             {BLANSKO_MUNICIPALITIES.length} obcí
@@ -698,7 +698,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                     isUser ? 'ml-auto' : 'mr-auto'
                   }`}
                 >
-                  <div className="flex items-center gap-1.5 text-[11px] text-stone-400 mb-1 px-1">
+                  <div className="flex items-center gap-1.5 text-xs text-stone-300 mb-1 px-1">
                     {isUser ? (
                       <span>Vy</span>
                     ) : (
@@ -850,7 +850,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                       <button
                         type="button"
                         onClick={() => setBuilderOrigin('Moje aktuální poloha')}
-                        className="absolute right-2 top-2 px-2 py-1 rounded bg-stone-800 hover:bg-stone-700 text-cyan-400 text-[10px] font-semibold transition-all cursor-pointer"
+                        className="absolute right-2 top-2 px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-cyan-400 text-xs font-semibold transition-all cursor-pointer"
                       >
                         Moje GPS
                       </button>
@@ -864,7 +864,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                     <Repeat className="w-4 h-4 text-cyan-400" />
                     <div>
                       <span className="text-xs font-semibold text-white block">Okruh (Návrat na start)</span>
-                      <span className="text-[10px] text-stone-400">Trasa se vrátí do výchozího místa po jiné větvi</span>
+                      <span className="text-xs text-stone-300">Trasa se vrátí do výchozího místa po jiné větvi</span>
                     </div>
                   </div>
                   <input
@@ -895,16 +895,16 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                 {/* Quick Blansko district selector chips */}
                 <div className="pt-2 border-t border-stone-800/60">
                   <div className="flex items-center justify-between mb-1.5">
-                    <span className="text-[11px] font-medium text-amber-400 flex items-center gap-1">
-                      <Building2 className="w-3 h-3" />
+                    <span className="text-xs font-semibold text-amber-400 flex items-center gap-1">
+                      <Building2 className="w-3.5 h-3.5" />
                       Rychlý výběr – Okres Blansko:
                     </span>
                     <button
                       type="button"
                       onClick={() => setActiveTab('blansko')}
-                      className="text-[11px] text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-0.5 cursor-pointer font-medium"
+                      className="text-xs text-amber-400 hover:text-amber-300 hover:underline flex items-center gap-0.5 cursor-pointer font-semibold"
                     >
-                      Katalog všech 116 obcí <ChevronRight className="w-3 h-3" />
+                      Katalog všech 116 obcí <ChevronRight className="w-3.5 h-3.5" />
                     </button>
                   </div>
                   <div className="flex flex-wrap gap-1.5 max-h-24 overflow-y-auto pr-1">
@@ -935,7 +935,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                             setBuilderDestination(locName);
                           }
                         }}
-                        className="px-2 py-0.5 rounded-lg bg-stone-950 hover:bg-amber-950/40 text-[11px] text-stone-300 hover:text-amber-300 border border-stone-800 hover:border-amber-700/50 transition-all cursor-pointer"
+                        className="px-2.5 py-1 rounded-lg bg-stone-950 hover:bg-amber-950/40 text-xs text-stone-200 hover:text-amber-300 border border-stone-800 hover:border-amber-700/50 transition-all cursor-pointer font-medium"
                         title={`Vybrat ${locName} jako ${builderIsLoop || !builderOrigin ? 'Start' : 'Cíl'}`}
                       >
                         {locName}
@@ -1105,8 +1105,8 @@ ${JSON.stringify(fallbackRoute, null, 2)}
 
               {/* Type Filter Pills */}
               <div className="flex items-center gap-1.5 overflow-x-auto pb-1 no-scrollbar">
-                <span className="text-[11px] text-stone-400 mr-1 flex items-center gap-1 shrink-0 font-medium">
-                  <Filter className="w-3 h-3" />
+                <span className="text-xs text-stone-300 mr-1 flex items-center gap-1 shrink-0 font-semibold">
+                  <Filter className="w-3.5 h-3.5" />
                   Filtr:
                 </span>
                 {[
@@ -1172,8 +1172,8 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                             <h4 className="text-sm font-bold text-white group-hover:text-amber-300 transition-colors">
                               {m.name}
                             </h4>
-                            <div className="flex items-center gap-2 text-[11px] text-stone-400">
-                              <span className="font-mono text-stone-300 font-medium">
+                            <div className="flex items-center gap-2 text-xs text-stone-300">
+                              <span className="font-mono text-stone-200 font-semibold">
                                 {m.elevationM} m n. m.
                               </span>
                             </div>
@@ -1182,14 +1182,14 @@ ${JSON.stringify(fallbackRoute, null, 2)}
 
                         {/* Type badge */}
                         <span
-                          className={`px-2 py-0.5 rounded-md text-[10px] font-semibold uppercase tracking-wider shrink-0 ${
+                          className={`px-2.5 py-1 rounded-md text-xs font-bold uppercase tracking-wider shrink-0 ${
                             isCity
                               ? 'bg-amber-950/80 text-amber-300 border border-amber-800/40'
                               : isMarketTown
                               ? 'bg-cyan-950/80 text-cyan-300 border border-cyan-800/40'
                               : isLandmark
                               ? 'bg-emerald-950/80 text-emerald-300 border border-emerald-800/40'
-                              : 'bg-stone-800/80 text-stone-400'
+                              : 'bg-stone-800/80 text-stone-300'
                           }`}
                         >
                           {m.type}
@@ -1209,30 +1209,30 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                       <button
                         type="button"
                         onClick={() => handleSelectBlanskoAsStart(m)}
-                        className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-[11px] text-emerald-300 font-semibold border border-stone-700 hover:border-emerald-600/40 transition-all cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-xs text-emerald-300 font-bold border border-stone-700 hover:border-emerald-600/40 transition-all cursor-pointer flex items-center gap-1"
                         title={`Nastavit ${m.name} jako výchozí bod`}
                       >
-                        <MapPin className="w-3 h-3 text-emerald-400" />
+                        <MapPin className="w-3.5 h-3.5 text-emerald-400" />
                         Jako Start
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handleSelectBlanskoAsDest(m)}
-                        className="px-2.5 py-1 rounded-lg bg-stone-800 hover:bg-stone-700 text-[11px] text-rose-300 font-semibold border border-stone-700 hover:border-rose-600/40 transition-all cursor-pointer flex items-center gap-1"
+                        className="px-3 py-1.5 rounded-lg bg-stone-800 hover:bg-stone-700 text-xs text-rose-300 font-bold border border-stone-700 hover:border-rose-600/40 transition-all cursor-pointer flex items-center gap-1"
                         title={`Nastavit ${m.name} jako cíl`}
                       >
-                        <MapPin className="w-3 h-3 text-rose-400" />
+                        <MapPin className="w-3.5 h-3.5 text-rose-400" />
                         Jako Cíl
                       </button>
 
                       <button
                         type="button"
                         onClick={() => handlePlanLoopFromBlansko(m)}
-                        className="ml-auto px-2.5 py-1 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-[11px] text-amber-300 font-semibold border border-amber-700/40 hover:border-amber-500/60 transition-all cursor-pointer flex items-center gap-1"
+                        className="ml-auto px-3 py-1.5 rounded-lg bg-amber-500/10 hover:bg-amber-500/20 text-xs text-amber-300 font-bold border border-amber-700/40 hover:border-amber-500/60 transition-all cursor-pointer flex items-center gap-1"
                         title={`Vygenerovat okružní cyklotrasu z ${m.name}`}
                       >
-                        <Sparkles className="w-3 h-3 text-amber-400" />
+                        <Sparkles className="w-3.5 h-3.5 text-amber-400" />
                         Okruh odsud (AI)
                       </button>
                     </div>
@@ -1314,7 +1314,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
               {/* Quick region tags and result count */}
               <div className="flex items-center justify-between gap-2 overflow-x-auto pb-1 text-xs">
                 <div className="flex items-center gap-1.5 shrink-0 overflow-x-auto">
-                  <span className="text-[11px] text-stone-500 font-semibold shrink-0">Region:</span>
+                  <span className="text-xs text-stone-300 font-semibold shrink-0">Region:</span>
                   {[
                     { label: 'Všechny', query: '' },
                     { label: 'Karlštejn', query: 'karlstejn' },
@@ -1331,10 +1331,10 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                         key={chip.label}
                         type="button"
                         onClick={() => setCuratedSearch(chip.query === '' ? '' : chip.label)}
-                        className={`px-2.5 py-1 rounded-full text-[11px] font-medium transition-all shrink-0 cursor-pointer ${
+                        className={`px-3 py-1.5 rounded-full text-xs font-semibold transition-all shrink-0 cursor-pointer ${
                           isSelected
-                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-semibold'
-                            : 'bg-stone-900 hover:bg-stone-800 text-stone-400 border border-stone-800'
+                            ? 'bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 font-bold'
+                            : 'bg-stone-900 hover:bg-stone-800 text-stone-300 border border-stone-800'
                         }`}
                       >
                         {chip.label}
@@ -1342,7 +1342,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                     );
                   })}
                 </div>
-                <span className="text-[11px] text-stone-500 whitespace-nowrap font-mono shrink-0">
+                <span className="text-xs text-stone-300 whitespace-nowrap font-mono font-semibold shrink-0">
                   {filteredCuratedRoutes.length} {filteredCuratedRoutes.length === 1 ? 'trasa' : filteredCuratedRoutes.length < 5 ? 'trasy' : 'tras'}
                 </span>
               </div>
@@ -1364,11 +1364,11 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                     <div className="flex items-start justify-between gap-3 mb-2">
                       <div>
                         <div className="flex items-center gap-2">
-                          <span className="text-[11px] font-bold text-cyan-400 uppercase tracking-wider">
+                          <span className="text-xs font-bold text-cyan-400 uppercase tracking-wider">
                             {route.region}
                           </span>
                           {route.difficulty && (
-                            <span className="px-1.5 py-0.5 rounded text-[10px] font-semibold bg-stone-800 text-stone-300">
+                            <span className="px-2 py-0.5 rounded text-xs font-bold bg-stone-800 text-stone-200">
                               {route.difficulty}
                             </span>
                           )}
@@ -1381,27 +1381,27 @@ ${JSON.stringify(fallbackRoute, null, 2)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-stone-300 leading-relaxed mb-3">{route.description}</p>
+                    <p className="text-xs sm:text-sm text-stone-200 leading-relaxed mb-3">{route.description}</p>
 
                     {/* Stats Grid */}
                     <div className="grid grid-cols-4 gap-2 p-2.5 rounded-xl glass-tile !bg-stone-950/60 border border-white/10 text-center mb-3 text-xs font-mono">
                       <div>
-                        <span className="text-[10px] text-stone-400 block font-sans">Délka</span>
+                        <span className="text-xs text-stone-300 block font-sans font-semibold">Délka</span>
                         <span className="font-extrabold text-cyan-400">{route.distanceKm} km</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-stone-400 block font-sans">Převýšení</span>
+                        <span className="text-xs text-stone-300 block font-sans font-semibold">Převýšení</span>
                         <span className="font-extrabold text-emerald-400">+{route.elevationGainM} m</span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-stone-400 block font-sans">Odhadovaný čas</span>
+                        <span className="text-xs text-stone-300 block font-sans font-semibold">Odhadovaný čas</span>
                         <span className="font-bold text-stone-200">
                           {Math.floor((route.estimatedDurationMin || 60) / 60)}h {(route.estimatedDurationMin || 60) % 60}m
                         </span>
                       </div>
                       <div>
-                        <span className="text-[10px] text-stone-400 block font-sans">Provoz</span>
-                        <span className="font-bold text-stone-300 text-[11px] truncate block">
+                        <span className="text-xs text-stone-300 block font-sans font-semibold">Provoz</span>
+                        <span className="font-bold text-stone-200 text-xs truncate block">
                           {route.trafficLevel?.split(' ')[0] || 'Bez aut'}
                         </span>
                       </div>
@@ -1478,14 +1478,14 @@ ${JSON.stringify(fallbackRoute, null, 2)}
       {/* Quick Prompt Chips Bar (in Chat mode) */}
       {activeTab === 'chat' && (
         <div className="px-3.5 py-2 border-t border-stone-800 bg-stone-900/60 overflow-x-auto shrink-0 flex items-center gap-2 no-scrollbar">
-          <span className="text-[11px] text-stone-500 whitespace-nowrap">Rychlé dotazy:</span>
+          <span className="text-xs text-stone-300 font-semibold whitespace-nowrap">Rychlé dotazy:</span>
           {QUICK_PROMPT_SUGGESTIONS.map((item, idx) => (
             <button
               key={idx}
               type="button"
               onClick={() => handleSendMessage(item.prompt)}
               disabled={isLoading}
-              className="px-2.5 py-1 rounded-lg bg-stone-800/80 hover:bg-stone-800 border border-stone-700/80 text-stone-300 hover:text-white text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 disabled:opacity-50"
+              className="px-3 py-1.5 rounded-lg bg-stone-800/80 hover:bg-stone-800 border border-stone-700/80 text-stone-200 hover:text-white text-xs whitespace-nowrap transition-all cursor-pointer shrink-0 disabled:opacity-50 font-medium"
             >
               {item.label}
             </button>
@@ -1521,7 +1521,7 @@ ${JSON.stringify(fallbackRoute, null, 2)}
               <Send className="w-5 h-5" />
             </button>
           </div>
-          <div className="flex items-center justify-between text-[10px] text-stone-500 mt-1.5 max-w-4xl mx-auto px-1">
+          <div className="flex items-center justify-between text-xs text-stone-400 mt-1.5 max-w-4xl mx-auto px-1">
             <span>Enter = odeslat • Shift+Enter = nový řádek</span>
             <span>Výpočet GPX a převýšení na veřejných mapách</span>
           </div>

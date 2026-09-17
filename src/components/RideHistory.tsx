@@ -37,21 +37,21 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
           <div className="glass-tile p-2.5 !rounded-xl">
-            <span className="text-[11px] text-stone-400 block font-medium">Celkem ujeto</span>
+            <span className="text-xs text-stone-300 block font-semibold">Celkem ujeto</span>
             <span className="text-xl font-extrabold font-mono text-emerald-400">{totalKm.toFixed(1)}</span>
             <span className="text-xs text-stone-400 ml-1">km</span>
           </div>
           <div className="glass-tile p-2.5 !rounded-xl">
-            <span className="text-[11px] text-stone-400 block font-medium">Celkový čas</span>
+            <span className="text-xs text-stone-300 block font-semibold">Celkový čas</span>
             <span className="text-lg font-bold font-mono text-white">{formatDuration(totalSeconds)}</span>
           </div>
           <div className="glass-tile p-2.5 !rounded-xl">
-            <span className="text-[11px] text-stone-400 block font-medium">Nastoupáno</span>
+            <span className="text-xs text-stone-300 block font-semibold">Nastoupáno</span>
             <span className="text-xl font-extrabold font-mono text-cyan-400">+{totalClimb}</span>
             <span className="text-xs text-stone-400 ml-1">m</span>
           </div>
           <div className="glass-tile p-2.5 !rounded-xl">
-            <span className="text-[11px] text-stone-400 block font-medium">Energie</span>
+            <span className="text-xs text-stone-300 block font-semibold">Energie</span>
             <span className="text-xl font-extrabold font-mono text-orange-400">{totalCalories}</span>
             <span className="text-xs text-stone-400 ml-1">kcal</span>
           </div>
@@ -67,7 +67,7 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
               <button
                 type="button"
                 onClick={onClearAll}
-                className="text-stone-400 hover:text-rose-400 text-[11px] underline cursor-pointer"
+                className="text-stone-300 hover:text-rose-400 text-xs underline cursor-pointer font-medium"
               >
                 Vymazat historii
               </button>
@@ -97,13 +97,13 @@ export const RideHistory: React.FC<RideHistoryProps> = ({
                   <div className="flex items-center gap-2 mb-1">
                     <span className="text-sm sm:text-base font-bold text-stone-100 truncate">{ride.name}</span>
                     {ride.aiAnalysis && (
-                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-[10px] font-semibold flex items-center gap-1 shrink-0">
+                      <span className="px-2 py-0.5 rounded-md bg-emerald-500/15 border border-emerald-500/30 text-emerald-300 text-xs font-bold flex items-center gap-1 shrink-0">
                         <Sparkles className="w-3 h-3 text-emerald-400" />
                         AI Analýza
                       </span>
                     )}
                     {ride.isSimulated && (
-                      <span className="px-1.5 py-0.5 rounded bg-cyan-950 text-cyan-400 text-[10px] border border-cyan-800/40">
+                      <span className="px-2 py-0.5 rounded bg-cyan-950 text-cyan-400 text-xs font-semibold border border-cyan-800/40">
                         Demo
                       </span>
                     )}

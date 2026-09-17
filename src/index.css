@@ -49,3 +49,136 @@ html, body, #root {
   background: rgba(26, 32, 40, 0.85) !important;
   border-color: rgba(255, 255, 255, 0.16) !important;
 }
+
+/* Typography & Dot-Matrix / Digital Segment Styling */
+.font-bernard-mt {
+  font-family: "Bernard MT Condensed", "Bernard MT", "Playfair Display", "Alfa Slab One", Georgia, serif !important;
+  letter-spacing: 0.03em;
+  font-feature-settings: "lnum", "tnum";
+}
+
+.theme-font-bernard-mt h1,
+.theme-font-bernard-mt h2,
+.theme-font-bernard-mt h3,
+.theme-font-bernard-mt .font-display,
+.theme-font-bernard-mt .app-brand-title,
+.theme-font-bernard-mt .nav-tab-btn,
+.theme-font-bernard-mt .banner-route-title,
+.theme-font-bernard-mt .hud-speed-value {
+  font-family: "Bernard MT Condensed", "Bernard MT", "Playfair Display", "Alfa Slab One", Georgia, serif;
+  letter-spacing: 0.025em;
+}
+
+.font-dot-matrix {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
+  letter-spacing: 0.08em;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.dot-matrix-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.08) 1.5px, transparent 1.5px);
+  background-size: 14px 14px;
+}
+
+.font-sports-mono {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.02em;
+}
+
+.font-bold-sans {
+  font-family: ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.04em;
+}
+
+/* Contrast Overrides */
+.theme-amoled-pure-black {
+  background-color: #000000 !important;
+}
+
+.theme-high-contrast-sun {
+  background-color: #000000 !important;
+  filter: contrast(1.15);
+}
+
+.theme-oled-night {
+  background-color: #080302 !important;
+}
+
+/* Sjednocení a čitelnost všech malých písem, slov a popisků v celé aplikaci */
+.text-\[9px\],
+.text-\[10px\],
+.text-\[11px\],
+.text-xs,
+small {
+  font-size: 0.8125rem !important; /* Jednotná minimální velikost 13px namísto nečitelných mikro-fontů */
+  line-height: 1.25rem !important;
+  letter-spacing: 0.015em;
+}
+
+.metric-label {
+  font-size: 0.8125rem !important;
+  line-height: 1.25rem !important;
+  font-weight: 700 !important;
+  letter-spacing: 0.04em !important;
+  color: #e7e5e4 !important; /* stone-200 pro maximální kontrast */
+}
+
+/* Text Scaling & Enhanced Readability for Bike Handlebar & Outdoor Riding */
+.text-scale-large {
+  --base-scale: 1.15;
+}
+.text-scale-large .text-\[9px\],
+.text-scale-large .text-\[10px\],
+.text-scale-large .text-\[11px\],
+.text-scale-large .text-xs,
+.text-scale-large small {
+  font-size: 0.925rem !important; /* cca 15px */
+  line-height: 1.35rem !important;
+}
+.text-scale-large .text-sm {
+  font-size: 1.025rem !important;
+  line-height: 1.45rem !important;
+}
+.text-scale-large .text-base {
+  font-size: 1.15rem !important;
+  line-height: 1.6rem !important;
+}
+.text-scale-large .metric-label {
+  font-size: 0.925rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.05em !important;
+}
+
+.text-scale-extra-large {
+  --base-scale: 1.30;
+}
+.text-scale-extra-large .text-\[9px\],
+.text-scale-extra-large .text-\[10px\],
+.text-scale-extra-large .text-\[11px\],
+.text-scale-extra-large .text-xs,
+.text-scale-extra-large small {
+  font-size: 1.05rem !important; /* cca 17px - extra velká a snadno čitelná slova */
+  line-height: 1.45rem !important;
+  font-weight: 700 !important;
+}
+.text-scale-extra-large .text-sm {
+  font-size: 1.15rem !important;
+  line-height: 1.6rem !important;
+  font-weight: 600 !important;
+}
+.text-scale-extra-large .text-base {
+  font-size: 1.3rem !important;
+  line-height: 1.75rem !important;
+}
+.text-scale-extra-large .metric-label {
+  font-size: 1.05rem !important;
+  font-weight: 800 !important;
+  letter-spacing: 0.06em !important;
+}
+.text-scale-extra-large .nav-tab-btn {
+  font-size: 1rem !important;
+  padding-left: 1.1rem !important;
+  padding-right: 1.1rem !important;
+}
